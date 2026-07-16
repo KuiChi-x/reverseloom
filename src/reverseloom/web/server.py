@@ -511,7 +511,7 @@ def create_app() -> FastAPI:
                         "artifact_dir": artifact_directory,
                         "artifact_base_dir": artifact_directory,
                         "session_id": run_session_id,
-                        "user_id": config.LOCAL_USER_ID,
+                        "user_id": config.cookie_user_id(run_session_id),
                     },
                 },
             }

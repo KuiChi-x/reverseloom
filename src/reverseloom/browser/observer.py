@@ -16,6 +16,7 @@ from langchain_core.runnables.config import RunnableConfig
 
 from reverseloom.browser.browser_manager import browser_manager
 from reverseloom.browser.browser_snapshot import capture_browser_snapshot
+from reverseloom.runtime import config as config_module
 
 # Reverse-engineering tools that make the observer include debugger state.
 _DEBUGGER_TOOL_NAMES = {
@@ -102,7 +103,14 @@ def create_browser_observer_node(*, tools: List[Any]):
 
     async def browser_observer_node(state: Dict[str, Any], config: RunnableConfig) -> Dict[str, Any]:
         session_id = str(state.get("session_id") or "default")
-        user_id = str((config or {}).get("configurable", {}).get("user_id") or session_id)
+        # user_id is injected under configurable.runtime_context (see server.py)
+        configurable = (config or {}).get("configurable", {}) or {}
+        runtime_context = configurable.get("runtime_context", {}) or {}
+        user_id = str(
+            runtime_context.get("user_id")
+            or configurable.get("user_id")
+            or config_module.cookie_user_id(session_id)
+        )
         logging.info(
             "[BrowserObserverNode] Capturing state for session: %s (include_debugger=%s)",
             session_id, include_debugger,

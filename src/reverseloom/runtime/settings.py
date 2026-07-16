@@ -77,6 +77,7 @@ SETTINGS_GROUPS = [
             _field("REVERSELOOM_PROXY_PORT", "代理端口", "远程代理服务端口。", field_type="number", minimum=1, maximum=65535, step=1),
             _field("REVERSELOOM_PROXY_USERNAME", "代理用户名", "由本地隧道注入 Proxy-Authorization，不直接交给 Chromium。"),
             _field("REVERSELOOM_PROXY_PASSWORD", "代理密码", "仅保存在本地 .env，界面中始终遮罩。", field_type="password", secret=True),
+            _field("REVERSELOOM_COOKIE_SCOPE", "登录态共享", "共享：登录一次，所有对话复用登录态；隔离：每个对话独立登录（适合多账号）。共享模式下登出或失效的 Cookie 不会自动清除，需手动清理。", field_type="select", default="shared", options=[{"value": "shared", "label": "共享（登录一次到处用）"}, {"value": "isolated", "label": "隔离（每对话独立登录）"}]),
         ],
     },
     {

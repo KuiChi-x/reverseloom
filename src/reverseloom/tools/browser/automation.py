@@ -10,6 +10,7 @@ from graphloom import StandardThoughtInput
 from langchain_core.tools import tool
 from reverseloom.browser.browser_manager import browser_manager
 from reverseloom.browser.element_geometry import get_center as _element_center
+from reverseloom.runtime import config as config_module
 from reverseloom.tools.browser.assistance import request_user_interaction
 from reverseloom.tools.browser.result_handler import handle_tool_result
 from reverseloom.browser.element_mapping_service import element_mapping_service
@@ -110,7 +111,10 @@ async def reset_browser_state(
     headers, and AST logs are always reset so the next observation is clean.
     """
     session_id = kwargs.get("session_id")
-    user_id = str(kwargs.get("runtime_context", {}).get("user_id") or session_id)
+    user_id = str(
+        kwargs.get("runtime_context", {}).get("user_id")
+        or config_module.cookie_user_id(str(session_id))
+    )
 
     async def _action():
         if new_fingerprint:

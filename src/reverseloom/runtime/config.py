@@ -9,6 +9,20 @@ from reverseloom.runtime.paths import default_db_path, default_session_dir
 # isolated per conversation.
 LOCAL_USER_ID: str = "local"
 
+# Cookie/login-state sharing across conversations.
+COOKIE_SCOPE: str = os.environ.get("REVERSELOOM_COOKIE_SCOPE", "shared").strip().lower()
+
+
+def cookie_user_id(session_id: str) -> str:
+    """Resolve the cookie-store identity for a session, honoring COOKIE_SCOPE.
+
+    shared  -> LOCAL_USER_ID (one store for all conversations)
+    isolated-> the session_id (a per-conversation store)
+    """
+    if COOKIE_SCOPE == "isolated":
+        return session_id
+    return LOCAL_USER_ID
+
 # Root directory for per-session browser profiles, identities, and artifacts.
 SESSION_BASE_DIR: str = os.path.abspath(str(default_session_dir()))
 

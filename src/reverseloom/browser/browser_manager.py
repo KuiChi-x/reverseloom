@@ -4,7 +4,7 @@ import os
 from typing import Dict, Any, Optional, List
 from patchright.async_api import async_playwright, Page, BrowserContext, Playwright, ProxySettings
 
-from reverseloom.runtime.config import SESSION_BASE_DIR, BROWSER_EXECUTABLE_PATH, UPSTREAM_PROXY_URL
+from reverseloom.runtime.config import SESSION_BASE_DIR, BROWSER_EXECUTABLE_PATH, UPSTREAM_PROXY_URL, cookie_user_id
 from reverseloom.browser.discovery import resolve_browser_executable
 from reverseloom.browser.fingerprint import FingerprintManager
 from reverseloom.browser.proxy import ProxyManager
@@ -54,8 +54,9 @@ class BrowserManager:
         if not self.playwright:
             await self.init_browser()
 
-        # 1. Fingerprint generation is isolated per conversation.
-        user_id = user_id or session_id
+        # 1. Fingerprint generation is isolated per conversation. Cookie identity
+        # follows COOKIE_SCOPE when the caller didn't pass one explicitly.
+        user_id = user_id or cookie_user_id(session_id)
         fingerprint = FingerprintManager.load_session_state(session_id)
         if fingerprint is None:
             probe_proxy = UPSTREAM_PROXY_URL or None

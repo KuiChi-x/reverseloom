@@ -15,7 +15,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-success)](LICENSE)
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 
-[![Download Windows EXE](https://img.shields.io/badge/⬇%20Download-Windows%20EXE-2ea44f?style=for-the-badge)](https://github.com/KuiChi-x/reverseloom/releases)
+[![Download for Windows](https://img.shields.io/badge/⬇%20Download-Windows%20v1.0.0-2ea44f?style=for-the-badge)](https://github.com/KuiChi-x/reverseloom/releases/download/1.0.0/reverseloom_win.zip)
 
 [中文](README.zh-CN.md) · **English** · [Three walls](#three-walls) · [Full power](#full-power) · [Quick start](#quick-start) · [Capabilities](#capabilities)
 
@@ -23,9 +23,7 @@
 
 <div align="center">
 
-<!-- 📹 Record a demo, save it to docs/demo.gif, and uncomment the next line to replace the static screenshot below -->
-<!-- <img src="docs/demo.gif" alt="reverseloom demo" width="820" /> -->
-<img src="docs/image/homepage.png" alt="reverseloom desktop UI" width="820" />
+<img src="docs/image/demo.gif" alt="reverseloom demo" width="820" />
 
 _Type one line in the desktop UI. Watch it reason, drive the browser, set breakpoints, reproduce the algorithm, and produce a crawler — live on the right._
 
@@ -93,12 +91,12 @@ Two ways — pick one. First, the honest prerequisites so nothing fails silently
 - 💡 For full "any site lets you in" anti-detection, also install [kc-browser](https://github.com/KuiChi-x/kc-browser) — see [Full power](#full-power).
 - 🐍 The Windows EXE ships its own Python runtime (with `curl_cffi` and the crawler dependencies), so the crawlers it generates run via `run_shell` with zero extra setup. On macOS you still need a callable system `python3` for that.
 
-### Option A: download the EXE, run it (Windows, try this first)
+### Option A: download, unzip, run (Windows, try this first)
 
 No Python, no environment setup.
 
-1. Grab the latest `reverseloom-win.exe` from [**Releases**](https://github.com/KuiChi-x/reverseloom/releases);
-2. Double-click — a native desktop window opens;
+1. Download [**reverseloom_win.zip (v1.0.0)**](https://github.com/KuiChi-x/reverseloom/releases/download/1.0.0/reverseloom_win.zip);
+2. Unzip and double-click `reverseloom.exe` inside — a native desktop window opens;
 3. In **Settings → Model** fill in your model's `BASE_URL` / `API Key` / `MODEL` (see [Configure](#configure)) and save.
 
 > Three steps, chatting within 3 minutes. To scrape sites with heavy bot detection, wire up kc-browser per [Full power](#full-power).
@@ -159,6 +157,10 @@ Browser and proxy (optional, also editable in the UI's Settings):
 ## 🛠️ Capabilities (30+ tools)
 
 Browser automation and JS reverse-engineering are the two mainstays; visual locating, file/shell, and progressive skills are auxiliary.
+
+<div align="center"><img src="docs/image/browser_task.gif" alt="reverseloom browser task demo" width="820" /></div>
+
+<p align="center"><sub>Running a task autonomously as a browser agent: navigate, click, fill forms, scrape across tabs.</sub></p>
 
 <details>
 <summary><b>🌐 Browser automation (primary)</b></summary>
