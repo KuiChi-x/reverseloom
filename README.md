@@ -122,7 +122,7 @@ Browser and proxy (optional, also editable in the UI's Settings):
 
 | Env var | Purpose |
 |---|---|
-| `REVERSELOOM_BROWSER_PATH` | Chromium-based browser path; leave empty to auto-detect an installed browser |
+| `REVERSELOOM_BROWSER_PATH` | Chromium-based browser path. Leave empty to auto-detect: scans the standard install locations for Chrome → Edge → Chromium → Brave (in that order) on Windows/macOS/Linux. Set this only if your browser lives in a non-standard location, or to force a specific build (e.g. kc-browser). If nothing is found and this is unset, startup fails with a message telling you to install one or set this var — reverseloom never downloads a browser. |
 | `REVERSELOOM_PROXY_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | Optional upstream proxy; auth is injected by a local tunnel, not handed to Chromium |
 
 > ⚠️ `run_shell` can execute arbitrary commands/scripts — only operate on local paths you trust.

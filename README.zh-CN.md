@@ -122,7 +122,7 @@ MODEL_REASONING_EFFORT=                  # 留空由模型决定，或 low / med
 
 | 环境变量 | 作用 |
 |---|---|
-| `REVERSELOOM_BROWSER_PATH` | Chromium 内核浏览器路径；留空自动探测系统浏览器 |
+| `REVERSELOOM_BROWSER_PATH` | Chromium 内核浏览器路径。留空则自动探测：在 Windows/macOS/Linux 的标准安装目录里按 Chrome → Edge → Chromium → Brave 顺序查找。仅当浏览器装在非标准位置、或想强制指定某个内核（如 kc-browser）时才需要设置。若未设置且一个都没找到，启动会失败并提示你安装或设置本变量——reverseloom 从不下载浏览器。 |
 | `REVERSELOOM_PROXY_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | 可选上游代理，由本地隧道注入认证，不直接交给 Chromium |
 
 > ⚠️ `run_shell` 可执行任意命令/脚本，只对你信任的本地路径操作。

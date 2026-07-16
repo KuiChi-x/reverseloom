@@ -10,6 +10,28 @@ SAFE_AUTHORIZATION_PROMPT = """
 
 """
 
+DELIVERY_STRATEGY_PROMPT = """
+<delivery_strategy>
+    Default output contract — holds unless the user EXPLICITLY requests browser automation:
+
+    - Any crawler you deliver or run to collect data must be browser-INDEPENDENT: it
+      runs on an HTTP client (e.g. curl_cffi) plus, when signing is required, a headless
+      JS sandbox. It must never drive Playwright / Puppeteer / Selenium / a real browser
+      to fetch data or to mint a token, signature, or cookie.
+    - You may still drive the browser YOURSELF to observe and analyze — navigate, capture
+      network traffic, debug JS, read the DOM. That is how you gather evidence. For a
+      one-off need you may simply return the data you observed, with no crawler.
+    - When a signature, token, cookie, encryption, or dynamic challenge blocks a plain HTTP
+      request, that blocker is the signal to reverse-engineer and reproduce it in code (the
+      deep-reverse flow) — NOT to fall back to driving a browser to produce the value.
+    - A browser-driven crawler, or a crawler that shells out to a browser to generate a
+      value, is an INCOMPLETE deliverable in the default (analysis) scenario.
+
+    Browser automation as the delivered mechanism is permitted ONLY on explicit user request.
+</delivery_strategy>
+
+"""
+
 BROWSER_AGENT_SPECIFIC_RULES_PROMPT = """
 <input>
     At every step, your input will consist of:

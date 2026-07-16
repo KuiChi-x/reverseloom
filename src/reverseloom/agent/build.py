@@ -9,6 +9,7 @@ from graphloom import build_agent_graph
 from reverseloom.browser import create_browser_observer_node
 from reverseloom.agent.prompts import (
     BROWSER_AGENT_SPECIFIC_RULES_PROMPT,
+    DELIVERY_STRATEGY_PROMPT,
     REVERSE_FIND_FAULT_PROMPT, SAFE_AUTHORIZATION_PROMPT,
 )
 from reverseloom.runtime.paths import default_skills_dir
@@ -24,7 +25,7 @@ _SKILLS_DIRS = [_SKILLS_DIR, str(default_skills_dir())]
 litellm.suppress_debug_info = True
 litellm.drop_params = True
 
-SYSTEM_PROMPT = SAFE_AUTHORIZATION_PROMPT + BROWSER_AGENT_SPECIFIC_RULES_PROMPT
+SYSTEM_PROMPT = SAFE_AUTHORIZATION_PROMPT + DELIVERY_STRATEGY_PROMPT + BROWSER_AGENT_SPECIFIC_RULES_PROMPT
 ALL_TOOLS = REVERSE_TOOLS + FILESYSTEM_TOOLS + AUTOMATION_TOOLS
 
 

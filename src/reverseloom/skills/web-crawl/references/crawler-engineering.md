@@ -20,11 +20,11 @@ Use the least expensive implementation that preserves correctness:
 | A few visible values | Browser actions and direct answer |
 | Existing export button | Trigger or reproduce the export |
 | Stable JSON response | HTTP crawler with `curl_cffi` |
-| Login plus normal navigation | Patchright browser crawler |
+| Login plus normal navigation | Patchright browser crawler (only when the user explicitly asked for browser automation; otherwise reproduce the auth in an HTTP client) |
 | Many detail pages | Queue URLs and checkpoint progress |
 | Unknown signing or encryption | Load `deep-reverse` before implementing |
 
-Do not reproduce a private protocol when browser-driven collection already satisfies a one-time task. Do not retain browser automation when the user explicitly requires a browser-independent crawler.
+For a one-time need you may drive the browser yourself and return the observed data without building a crawler. But any crawler you deliver is browser-independent by default: do not deliver, or shell out to, browser automation to collect data or to mint a token/signature/cookie unless the user explicitly asked for browser automation. When a plain HTTP request is blocked by signing, tokens, or encryption, load `deep-reverse` and reproduce the value in code rather than driving a browser to produce it.
 
 ## Project layout
 
@@ -59,6 +59,8 @@ Required properties:
 Build the request from observed evidence. Do not guess hidden headers or signing inputs. Load `deep-reverse` when required values cannot be regenerated reliably.
 
 ## Browser crawlers
+
+Deliver a Patchright browser crawler ONLY when the user explicitly asked for browser automation. In the default analysis scenario a browser-driven crawler is an incomplete deliverable — reproduce the workflow in a browser-independent HTTP client instead, and load `deep-reverse` if signing or tokens block it. The patterns below apply when browser automation was explicitly requested.
 
 Use Patchright when the workflow depends on rendered DOM, user interactions, browser login state, downloads, or browser-only state.
 
