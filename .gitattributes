@@ -1,0 +1,2 @@
+# Normalize line endings: store LF in the repo, let Git handle checkout per-OS.
+* text=auto eol=lf

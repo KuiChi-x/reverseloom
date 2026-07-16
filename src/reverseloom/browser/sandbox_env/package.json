@@ -1,0 +1,19 @@
+{
+  "name": "reverseloom-sandbox",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Undetectable browser sandbox with jsdom + anti-detection armor + self-revealing monitor",
+  "author": "KuiChi-x",
+  "main": "reverseloom-sandbox.js",
+  "scripts": {
+    "build": "webpack --config webpack.config.js"
+  },
+  "dependencies": {
+    "jsdom": "^29.1.1"
+  },
+  "devDependencies": {
+    "terser-webpack-plugin": "^5",
+    "webpack": "^5",
+    "webpack-cli": "^6"
+  }
+}

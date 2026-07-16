@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reverseloom"
+version = "0.1.0"
+description = "A local, open-source deep browser automation + web reverse-engineering agent with a desktop UI, woven on the graphloom agent framework."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "KuiChi-x" }]
+keywords = ["agent", "browser-automation", "reverse-engineering", "llm", "graphloom", "cdp", "patchright"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "graphloom>=0.1",
+    "langchain-litellm>=0.7,<0.8",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-dotenv>=1.0",
+    "aiohttp>=3.9",
+    "websockets>=12",
+    "patchright>=1.40",
+    "pywebview>=5",
+    "pillow>=10",
+    "numpy>=1.24",
+    "openpyxl>=3.1",
+    "lxml>=5",
+    "duckdb>=1.0",
+    "curl_cffi>=0.7",
+    "tldextract>=5.1",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "SQLAlchemy>=2.0",
+]
+
+[project.scripts]
+reverseloom = "reverseloom.__main__:main"
+
+[project.optional-dependencies]
+postgres = ["langgraph-checkpoint-postgres>=2.0", "psycopg[binary,pool]>=3.1"]
+dev = ["pytest>=7", "pytest-asyncio>=0.21", "ruff>=0.6", "pyinstaller"]
+
+# graphloom is not yet on PyPI. Until it is, install it from source, e.g.:
+#   pip install "graphloom @ git+https://github.com/KuiChi-x/graphloom.git"
+# or clone it and `pip install -e ../graphloom`.
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+reverseloom = ["static/*", "skills/*/SKILL.md", "skills/*/references/*", "skills/*/scripts/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

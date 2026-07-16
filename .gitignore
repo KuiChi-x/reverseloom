@@ -1,0 +1,40 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Distribution
+build/
+dist/
+*.egg-info/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Agent workspaces (runtime output)
+workspace/
+workspaces/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node sandbox deps (rebuild with `npm install` in sandbox_env; bundle.js is committed)
+node_modules/
+sandbox_env/node_modules/
+.reverseloom_sessions
+.claude
+.agents
