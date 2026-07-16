@@ -4,17 +4,18 @@
 
 # reverseloom
 
-### 🕸️ Hand the whole browser to an LLM — a browser agent *and* a web reverse-engineer in one.
+### 🕸️ Hand the whole browser to an LLM — it gets in, reverses the protocol, and writes a crawler that runs without a browser.
 
-**Local · open-source · with a desktop UI.** Its **observer architecture** exposes the browser's full state (DOM, screenshot, network, JS debugger) to the model in real time — so it can click, fill forms, and scrape, *and* **set CDP breakpoints, crack sign/token/encryption algorithms, and write a crawler that runs without a browser**. Woven on [graphloom](https://github.com/KuiChi-x/graphloom).
+**Local · open-source · with a desktop UI.** Say "I want this site's data," and its **observer architecture** lays the browser fully open to the model — DOM, screenshot, every network request, the live JS breakpoint state — so it can **get past bot detection, set CDP breakpoints to extract the sign/encryption algorithm, reproduce it offline in a sandbox, and deliver a crawler that passes a cold start**. Woven on [graphloom](https://github.com/KuiChi-x/graphloom); pair it with [kc-browser](https://github.com/KuiChi-x/kc-browser)'s kernel-level fingerprint browser to reach any site.
 
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Built on graphloom](https://img.shields.io/badge/built%20on-graphloom-1C3C3C)](https://github.com/KuiChi-x/graphloom)
 [![Browser](https://img.shields.io/badge/browser-patchright%20+%20CDP-4285F4?logo=googlechrome&logoColor=white)](https://github.com/Kaliiiiiiiiii-Vinyzu/patchright)
+[![Anti-detect: kc-browser](https://img.shields.io/badge/anti--detect-kc--browser-8A2BE2)](https://github.com/KuiChi-x/kc-browser)
 [![License](https://img.shields.io/badge/license-Apache%202.0-success)](LICENSE)
 ![Status](https://img.shields.io/badge/status-alpha-orange)
 
-[中文](README.zh-CN.md) · **English** · [Quick start](#-quick-start-60-seconds) · [Capabilities](#️-capabilities-30-tools)
+[中文](README.zh-CN.md) · **English** · [Three walls](#three-walls) · [Full power](#full-power) · [Quick start](#quick-start) · [Capabilities](#capabilities)
 
 </div>
 
@@ -42,6 +43,20 @@ Most browser agents feed the model only "a screenshot + clickable elements," so 
 
 From "I can scrape what I can see" to "I can reverse what I can't." That's the payoff of exposing the *whole* browser to the model.
 
+<a id="three-walls"></a>
+
+## 🧱 Scraping has three walls. reverseloom tears through all of them in one stack.
+
+Anyone who's built a scraper knows there are three walls between you and the data. Most tools clear only one. reverseloom welds all three into **a single pipeline**:
+
+| | The wall | The usual way | reverseloom's one-stack answer |
+|---|---|---|---|
+| 🧱 **Wall 1** | **Can't get in** — the site detects an automated browser and blocks you | hand-patched fingerprints or paid cloud, still leaking `navigator.webdriver` and CDP traces | pair with [**kc-browser**](https://github.com/KuiChi-x/kc-browser): a **C++ kernel-level** anti-detect fingerprint browser — the identity grows from inside the engine, no injected script to unwrap, **any site lets you in** |
+| 🧱 **Wall 2** | **Can't reverse it** — data is guarded by a signature / token / encrypted body | hand-reading obfuscated JS, a full day per algorithm | **full exposure + CDP breakpoints**: the model sets its own breakpoints, traces the generator, drags it into a Node sandbox to reproduce offline — not done until 5/5 cold-start replays pass |
+| 🧱 **Wall 3** | **Can't run it** — the crawler still needs a browser attached, slow and fragile | a headless browser resident forever, breaking on every update | delivers a **browser-free, cold-start-ready** pure-code crawler blueprint |
+
+**That's why it lands**: other tools stop at one wall; reverseloom welds "get in → reverse → ship a standalone crawler" into one chain. And the full-power answer to Wall 1 is its sibling project, **[kc-browser](https://github.com/KuiChi-x/kc-browser)** — see [Full power](#full-power).
+
 ## ✨ Highlights
 
 - 🔬 **Real reverse-engineering** — not just reading the DOM. Runtime breakpoint debugging (`set_line_breakpoint` / `break_on_request` / `evaluate_in_call_frame` / `step_execution`), network request tracing, webpack module extraction — pulls sign/token/encryption algorithms out of obfuscated code.
@@ -50,7 +65,7 @@ From "I can scrape what I can see" to "I can reverse what I can't." That's the p
 - 🧠 **observer architecture, context never blows up** — each turn injects only the *current* browser snapshot (overwrite, never into history), so long reverse-engineering sessions never bury the context window under piles of screenshots.
 - 🛠️ **30+ tools + progressive skills** — browser automation, CDP reverse-engineering, multimodal visual locating, file/shell. `web-crawl` / `deep-reverse` skills load on demand and don't pollute context.
 - 🔌 **Any OpenAI-compatible model** — GPT / Claude / Gemini / DeepSeek / OpenRouter / Ollama… switch with one config line.
-- 🥷 **Humanized + isolated** — WindMouse humanized paths for slider captchas; every session gets its own fingerprint, profile, and optional authenticated proxy tunnel with IP rotation.
+- 🥷 **Anti-detect + humanized + isolated** — reach any site with [kc-browser](https://github.com/KuiChi-x/kc-browser)'s kernel-level fingerprint; WindMouse humanized paths for slider captchas; each session gets its own fingerprint, profile, and optional authenticated proxy tunnel with IP rotation.
 - 🔒 **Fully local** — API keys, cookies, output, and history all stay on your machine. No cloud round-trips.
 
 ## 🆚 How it differs from ordinary browser agents
@@ -64,6 +79,8 @@ From "I can scrape what I can see" to "I can reverse what I can't." That's the p
 | Deliverable | one-off action result | ✅ a **crawler blueprint** that runs cold, browser-free |
 | Browser | often manual launch, downloads Chromium | ✅ auto-launches your system browser, zero download |
 | Runs | mostly cloud SaaS | ✅ fully local, data never leaves |
+
+<a id="quick-start"></a>
 
 ## 🚀 Quick start (60 seconds)
 
@@ -109,6 +126,8 @@ Browser and proxy (optional, also editable in the UI's Settings):
 | `REVERSELOOM_PROXY_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | Optional upstream proxy; auth is injected by a local tunnel, not handed to Chromium |
 
 > ⚠️ `run_shell` can execute arbitrary commands/scripts — only operate on local paths you trust.
+
+<a id="capabilities"></a>
 
 ## 🛠️ Capabilities (30+ tools)
 
@@ -166,6 +185,27 @@ reverseloom solves this with graphloom's **observer node**: before each decision
 
 **Sandbox layer**: take a sign/token/encrypted-body generator dumped from a page and **run it offline** in Node + jsdom. The sandbox has anti-detection armor (mark-native / jsdom-hider / chrome-overlay / fingerprint overrides) plus deep-Proxy monitoring; feed it a JSON payload (target script + call code + fingerprint) and it returns the generated result, a todo list of missing APIs, and captured network.
 
+<a id="full-power"></a>
+
+## 🥷 Full power: pair with kc-browser to reach any site
+
+reverseloom's first wall — **getting past bot detection** — has a full-power answer in its sibling project, [**kc-browser**](https://github.com/KuiChi-x/kc-browser).
+
+Ordinary anti-detection "patches" the JS layer: erase `navigator.webdriver`, spoof the UA… but patches leave seams that can be unwrapped. **kc-browser takes the other road — it modifies Chromium's C++ kernel directly**, so the fingerprint grows from the engine bottom-up:
+
+- 🧬 **Kernel-level spoofing, not a script bolt-on** — UA / Client Hints / WebGL / Canvas / Audio / fonts / hardware / timezone all generated consistently inside the engine; no injectable script to unwrap, no `navigator.webdriver`, no CDP banner.
+- 🌱 **One seed = one self-consistent identity** — a 64-bit seed deterministically derives the whole fingerprint; GPU sampled from ~130 real consumer cards by market share, locale/timezone aligned to the exit IP across 95+ regions.
+- 🔄 **Rotate identity without restarting**, present as Windows / macOS / Linux at will, headless or headed.
+
+reverseloom already speaks its interface — the `--fp-seed` / `--fp-timezone` / `--fp-platform` args in `fingerprint.py` are exactly kc-browser's flags. **Point it there and any site lets you in:**
+
+```dotenv
+# After downloading kc-browser, give reverseloom its executable path (or set it in the UI's Settings)
+REVERSELOOM_BROWSER_PATH=/path/to/kc-browser
+```
+
+> Regular Chrome / Edge works too — the flags are simply ignored and it degrades to ordinary anti-detection. For the full "any site lets you in" experience, pair it with kc-browser. 👉 [**Learn / download kc-browser**](https://github.com/KuiChi-x/kc-browser)
+
 ## 📂 Project layout
 
 ```
@@ -205,11 +245,23 @@ The author and contributors are not responsible for any misuse.
 
 Issues and PRs welcome. Development, testing, sandbox rebuild, and Windows EXE / macOS App packaging commands are in the [development guide](docs/development.md).
 
+## 🧩 The family
+
+Three projects, one pipeline — get in, reverse, drive:
+
+| Project | Layer | One line |
+|---|---|---|
+| [**kc-browser**](https://github.com/KuiChi-x/kc-browser) | 🥷 get in | C++ kernel-level anti-detect fingerprint browser — one seed = one self-consistent identity, any site lets you in |
+| [**reverseloom**](https://github.com/KuiChi-x/reverseloom) | 🔬 reverse | observer full-exposure + CDP reverse-engineering + sandbox reproduction, ships a browser-free crawler (this repo) |
+| [**graphloom**](https://github.com/KuiChi-x/graphloom) | 🧵 drive | the underlying agent framework — observer architecture, context compaction, and progressive skills all come from it |
+
+Find the combo useful? A ⭐ on all three is the best support for the whole pipeline.
+
 ## ⭐ Star History
 
 If it saved you hours of reverse-engineering, a Star helps 👇
 
-[![Star History Chart](https://api.star-history.com/svg?repos=KuiChi-x/reverseloom&type=Date)](https://star-history.com/#KuiChi-x/reverseloom&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=KuiChi-x/reverseloom,KuiChi-x/kc-browser,KuiChi-x/graphloom&type=Date)](https://star-history.com/#KuiChi-x/reverseloom&KuiChi-x/kc-browser&KuiChi-x/graphloom&Date)
 
 ## 📄 License
 
@@ -219,7 +271,7 @@ If it saved you hours of reverse-engineering, a Star helps 👇
 
 <div align="center">
 
-Built on [graphloom](https://github.com/KuiChi-x/graphloom) 🧵 · [中文文档](README.zh-CN.md) · [Report a bug](https://github.com/KuiChi-x/reverseloom/issues) · [Request a feature](https://github.com/KuiChi-x/reverseloom/issues)
+🧩 Family: [kc-browser](https://github.com/KuiChi-x/kc-browser) (get in) · reverseloom (reverse) · [graphloom](https://github.com/KuiChi-x/graphloom) (drive) · [中文文档](README.zh-CN.md) · [Report a bug / request a feature](https://github.com/KuiChi-x/reverseloom/issues)
 
 <sub><b>Keywords</b> · browser agent · web reverse engineering · JS reverse engineering · anti-bot / anti-detection · CDP debugging · sign / token / encryption cracking · captcha bypass · crawler generator · web scraping · LLM agent<br/>
 <b>关键词</b> · 浏览器 Agent · 网页逆向 · JS 逆向 · 爬虫 · 反爬 · 验证码破解 · 签名/加密算法还原 · 断点调试 · 数据采集 · 大模型智能体</sub>
