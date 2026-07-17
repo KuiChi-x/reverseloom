@@ -555,6 +555,8 @@ def create_app() -> FastAPI:
                 await _send_run(run_session_id, {"type": "error", "text": f"{type(exc).__name__}: {exc}"})
             finally:
                 ws.app.state.cancels.pop(run_session_id, None)
+                # Trim this thread's checkpoint history so the DB doesn't grow without bound.
+                await ws.app.state.ckpt.prune_thread(run_session_id)
 
         try:
             while True:

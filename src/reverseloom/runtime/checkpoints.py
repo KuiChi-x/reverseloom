@@ -94,6 +94,16 @@ class CheckpointerManager:
         await saver.setup()
         return saver
 
+    async def prune_thread(self, thread_id: str) -> None:
+        """Keep only the latest checkpoint per namespace for this thread
+        """
+        if self.checkpointer is None:
+            return
+        try:
+            await self.checkpointer.aprune([thread_id], strategy="keep_latest")
+        except Exception:
+            pass
+
     async def close(self) -> None:
         if self._conn is not None:
             try:
