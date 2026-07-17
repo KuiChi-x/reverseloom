@@ -66,10 +66,6 @@ crawler = [
     "x-client-transaction-id>=0.0.1",
 ]
 
-# graphloom is not yet on PyPI. Until it is, install it from source, e.g.:
-#   pip install "graphloom @ git+https://github.com/KuiChi-x/graphloom.git"
-# or clone it and `pip install -e ../graphloom`.
-
 [tool.setuptools.packages.find]
 where = ["src"]
 

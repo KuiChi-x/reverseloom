@@ -82,11 +82,12 @@ The EXE ships its own Python runtime, so generated crawlers run via `run_shell` 
 
 ```bash
 git clone https://github.com/KuiChi-x/reverseloom.git && cd reverseloom
-pip install "graphloom @ git+https://github.com/KuiChi-x/graphloom.git"
-pip install -e . && pip install patchright   # no `patchright install chromium` needed
+pip install -e .               # pulls graphloom + patchright from PyPI; no `patchright install chromium`
 python -m reverseloom          # native desktop window
 python -m reverseloom --web    # or serve, open in your browser
 ```
+
+For local development (tests, lint, agent-generated crawlers), use `pip install -e ".[dev,crawler]"` — see [docs/development.md](docs/development.md).
 
 The Node sandbox ships prebuilt (`reverseloom-sandbox.bundle.js`) — works out of the box.
 
