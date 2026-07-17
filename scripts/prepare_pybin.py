@@ -36,9 +36,28 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-# Dependencies the generated crawlers import. curl_cffi pulls the rest of the
-# tree (cffi, certifi, rich, orjson, ...) transitively via pip.
-CRAWLER_DEPS = ["curl_cffi"]
+# Libraries the agent-generated crawlers import, staged into the bundled runtime
+# so crawlers run with zero user setup. Keep this in sync with the [crawler]
+# optional-dependencies group in pyproject.toml. pip resolves each package's
+# full transitive tree (curl_cffi -> cffi/certifi/..., parsel -> lxml/w3lib/cssselect,
+# etc.), so nothing is silently missed. The PyPI `datetime` package is
+# intentionally excluded (it shadows the stdlib datetime module).
+CRAWLER_DEPS = [
+    "curl_cffi",
+    "openpyxl",
+    "tldextract",
+    "beautifulsoup4",
+    "parsel",
+    "loguru",
+    "pycryptodome",
+    "tenacity",
+    "brotli",
+    "python-dateutil",
+    "protobuf",
+    "imap-tools",
+    "xlrd",
+    "x-client-transaction-id",
+]
 
 
 def _embeddable_url(version: str, arch: str) -> str:
