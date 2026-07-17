@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import re
-import shutil
 from datetime import datetime, timezone, timedelta
 from typing import List, Any, Dict, Optional, Tuple, Literal
 from urllib.parse import urlparse
@@ -2112,8 +2111,8 @@ async def extract_webpack_loader(script_id: str, module_ids: List[str] = [], **k
         note += f" Truncated to {max_size} chars."
 
     # Save to session dir
-    from reverseloom.runtime.config import SESSION_BASE_DIR
-    artifact_dir = os.path.join(SESSION_BASE_DIR, session_id)
+    from reverseloom.runtime.config import artifact_dir as _artifact_dir
+    artifact_dir = _artifact_dir(session_id)
     os.makedirs(artifact_dir, exist_ok=True)
     filename = f"webpack_loader_{script_id}.js"
     filepath = os.path.join(artifact_dir, filename)
@@ -2156,36 +2155,6 @@ def _register_dumped_asset(session_id: str, filepath: str, summary: str, produce
     session_store.set(session_id, "delivery_status", delivery_status)
 
 
-def _materialize_sandbox_bundle(session_id: str, artifact_dir: str, producer: str = "") -> None:
-    """Copy the project-bundled, verified sandbox engine into the session dir
-    (if not already present) and register it as a runtime mount so it rides
-    along with the delivery. This lets the replay wrapper reference the bundle
-    by a session-relative filename and guarantees the coder receives the exact
-    verified engine — never a hand-rolled jsdom rebuild."""
-    from pathlib import Path
-
-    bundle_src = (
-        Path(__file__).parents[2] / "browser" / "sandbox_env" / "reverseloom-sandbox.bundle.js"
-    )
-    if not bundle_src.is_file():
-        return
-    dest = os.path.join(artifact_dir, bundle_src.name)
-    if not os.path.isfile(dest):
-        try:
-            shutil.copy2(str(bundle_src), dest)
-        except OSError:
-            return
-    try:
-        size = os.path.getsize(dest)
-    except OSError:
-        size = 0
-    _register_dumped_asset(
-        session_id, dest,
-        f"reverseloom sandbox engine (Node + jsdom) required to run generators offline ({size} bytes)",
-        producer=producer,
-    )
-
-
 @tool("dump_runtime_asset", args_schema=DumpRuntimeAssetInput)
 async def dump_runtime_asset(
     request_id: str = "",
@@ -2213,16 +2182,11 @@ async def dump_runtime_asset(
         or kwargs.get("current_agent_name")
         or ""
     ).strip()
-    from reverseloom.runtime.config import SESSION_BASE_DIR
+    from reverseloom.runtime.config import artifact_dir as _artifact_dir
     from urllib.parse import urlsplit
 
-    artifact_dir = os.path.join(SESSION_BASE_DIR, session_id)
+    artifact_dir = _artifact_dir(session_id)
     os.makedirs(artifact_dir, exist_ok=True)
-
-    # Dumping an asset means the agent is heading into sandbox reproduction;
-    # ship the verified sandbox engine alongside so the delivery is complete
-    # and the agent never rebuilds the runtime by hand.
-    _materialize_sandbox_bundle(session_id, artifact_dir, producer=producer)
 
     session = browser_manager.get_session(session_id)
 

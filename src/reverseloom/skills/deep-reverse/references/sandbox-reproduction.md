@@ -44,14 +44,15 @@ Invoke the bundle as a subprocess and send the payload as a single JSON line on
 stdin. The **last non-empty stdout line** is the JSON report; earlier lines are
 diagnostic logs (ignore them).
 
-`dump_runtime_asset` materializes the verified engine `reverseloom-sandbox.bundle.js`
-into the session artifact directory and registers it as a runtime mount, so it
-travels with the delivery automatically. Invoke it by that session-relative
-filename — never hand-roll a jsdom setup of your own.
+Mount the verified engine by listing it in `run_shell(runtime_files=[...])`: the
+exact name `reverseloom-sandbox.bundle.js` is copied next to your wrapper and
+registered so it travels with the delivery automatically. List every other
+dependency (dumped scripts, WASM, `browser_fingerprint.json`) the same way, and
+reference each by its relative filename — never hand-roll a jsdom setup of your own.
 
 ```python
 node = os.environ.get("REVERSELOOM_NODE_PATH") or "node"
-bundle = "reverseloom-sandbox.bundle.js"  # materialized next to your wrapper by dump_runtime_asset
+bundle = "reverseloom-sandbox.bundle.js"  # mount via run_shell(runtime_files=["reverseloom-sandbox.bundle.js", ...])
 proc = subprocess.run(
     [node, bundle],
     input=json.dumps(payload),

@@ -169,9 +169,9 @@ description: "Use only for explicit web or API protocol reverse engineering: end
     Deliver only after 5/5 independent replays pass (fresh session each).
     Only when all mission objectives are conclusively proven and documented, call `deliver_artifact` to terminate the session successfully.
     Browser automation is NEVER an acceptable output — not as the primary approach, not as a fallback.
-    NEVER hand-roll or reimplement the sandbox runtime. The verified engine
-    `reverseloom-sandbox.bundle.js` is materialized into the session by
-    `dump_runtime_asset` and ships with the delivery automatically; reproduce
+    NEVER hand-roll or reimplement the sandbox runtime. Mount the verified engine
+    `reverseloom-sandbox.bundle.js` via `run_shell(runtime_files=[...])`; it is
+    copied next to your wrapper and ships with the delivery automatically; reproduce
     generators by driving that bundle. Writing a standalone script that rebuilds
     its own jsdom/window/anti-detection environment is a fatal gap, not a deliverable.
     Users need to be able to write code and retrieve data directly from the blueprint; therefore, do not write or submit blueprint artifacts until the protocol analysis is fully completed.

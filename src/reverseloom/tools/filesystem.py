@@ -2,6 +2,7 @@
 import asyncio
 import locale
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -12,6 +13,9 @@ from langchain_core.tools import tool
 from pydantic import Field
 
 from graphloom import StandardThoughtInput
+
+_SANDBOX_ENV_DIR = Path(__file__).parents[1] / "browser" / "sandbox_env"
+_BUNDLED_SANDBOX_ENGINE = _SANDBOX_ENV_DIR / "reverseloom-sandbox.bundle.js"
 
 
 def _runtime_base(runtime_context: dict | None = None) -> str:
@@ -57,6 +61,17 @@ class ShellInput(StandardThoughtInput):
     command: str = Field(description="Shell command to run.")
     cwd: str = Field(default=".", description="Working directory. Relative paths resolve from the current session artifact directory.")
     timeout_seconds: int = Field(default=180, ge=1, le=86400, description="Maximum execution time in seconds.")
+    runtime_files: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Session-relative resource filenames to mount next to the script before "
+            "running (copied into the working dir and registered for delivery). "
+            "Examples: ['reverseloom-sandbox.bundle.js', 'xxx_bootstrap.js', "
+            "'browser_fingerprint.json', 'module.wasm']. Use the exact name "
+            "'reverseloom-sandbox.bundle.js' to mount the verified sandbox engine. "
+            "Relative filenames only; absolute paths and '..' are rejected."
+        ),
+    )
 
 
 def _decode_shell_output(value: bytes | str | None) -> str:
@@ -107,11 +122,7 @@ def _shell_env(artifact_dir: str) -> dict[str, str]:
             current = env.get("PATH", "")
             env["PATH"] = python_dir + (os.pathsep + current if current else "")
 
-    sandbox_dir = Path(__file__).parents[1] / "browser" / "sandbox_env"
-    bundle = sandbox_dir / "reverseloom-sandbox.bundle.js"
-    node_modules = sandbox_dir / "node_modules"
-    if bundle.is_file():
-        env["REVERSELOOM_SANDBOX_BUNDLE"] = str(bundle)
+    node_modules = _SANDBOX_ENV_DIR / "node_modules"
     if node_modules.is_dir():
         current = env.get("NODE_PATH", "")
         env["NODE_PATH"] = str(node_modules) + (os.pathsep + current if current else "")
@@ -269,13 +280,85 @@ async def _terminate_process_tree(process: asyncio.subprocess.Process) -> None:
         pass
 
 
+def _reject_unsafe_relative_name(name: str) -> str:
+    value = str(name or "").strip().replace("\\", "/")
+    if not value:
+        raise ValueError("empty runtime file name is not allowed")
+    if os.path.isabs(value) or any(part == ".." for part in value.split("/")):
+        raise ValueError(f"runtime_files must be session-relative names, got: {name}")
+    return os.path.basename(value)
+
+
+def _mount_runtime_files(
+    runtime_files: List[str],
+    artifact_dir: str,
+    execution_dir: str,
+    runtime_context: dict | None,
+) -> List[str]:
+    """Ensure each requested runtime file exists next to the script and is
+    registered for delivery. The bundled sandbox engine is materialized from
+    the package on demand; every other name must already be a session artifact.
+    Returns the list of mounted basenames. Raises ValueError on a bad name."""
+    from reverseloom.tools.browser.investigation import _register_dumped_asset
+
+    session_id = str((runtime_context or {}).get("session_id") or "default")
+    producer = str((runtime_context or {}).get("current_agent_name") or "")
+    mounted: List[str] = []
+    for raw in runtime_files or []:
+        name = _reject_unsafe_relative_name(raw)
+        dest = os.path.join(execution_dir, name)
+        if not os.path.isfile(dest):
+            if name == _BUNDLED_SANDBOX_ENGINE.name and _BUNDLED_SANDBOX_ENGINE.is_file():
+                shutil.copy2(str(_BUNDLED_SANDBOX_ENGINE), dest)
+            else:
+                src = os.path.join(artifact_dir, name)
+                if os.path.abspath(src) != os.path.abspath(dest) and os.path.isfile(src):
+                    shutil.copy2(src, dest)
+        if not os.path.isfile(dest):
+            raise FileNotFoundError(
+                f"runtime file not found: {name} (write it as an artifact first, "
+                f"or use the exact bundled engine name '{_BUNDLED_SANDBOX_ENGINE.name}')"
+            )
+        try:
+            size = os.path.getsize(dest)
+        except OSError:
+            size = 0
+        _register_dumped_asset(
+            session_id, dest,
+            f"Runtime dependency mounted for sandbox replay ({size} bytes)",
+            producer=producer,
+        )
+        mounted.append(name)
+    return mounted
+
+
 @tool("run_shell", args_schema=ShellInput)
-async def run_shell(command: str, cwd: str = ".", timeout_seconds: int = 180, **kwargs) -> str:
-    """Run a shell command in the current session artifact directory or an explicit directory."""
+async def run_shell(
+    command: str,
+    cwd: str = ".",
+    timeout_seconds: int = 180,
+    runtime_files: List[str] = None,
+    **kwargs,
+) -> str:
+    """Run a shell command in the current session artifact directory or an explicit directory.
+
+    List any sandbox dependencies in `runtime_files` (session-relative names) and
+    they are copied next to the script and registered so they travel with the
+    delivery. Use the exact name 'reverseloom-sandbox.bundle.js' to mount the
+    verified engine; reference every dependency by its relative filename so the
+    same command works in-session and in the delivered crawler."""
     runtime_context = kwargs.get("runtime_context")
     execution_dir = _resolve_path(cwd, runtime_context=runtime_context)
     if not os.path.isdir(execution_dir):
         return f"Error: not a directory: {cwd}"
+
+    if runtime_files:
+        try:
+            _mount_runtime_files(
+                runtime_files, _runtime_base(runtime_context), execution_dir, runtime_context,
+            )
+        except (ValueError, FileNotFoundError, OSError) as exc:
+            return f"Error mounting runtime_files: {exc}"
 
     process = None
     try:

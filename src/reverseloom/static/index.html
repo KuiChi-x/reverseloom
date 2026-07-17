@@ -628,8 +628,42 @@ function decorateRenderedLinks(root) {
     if (/^https?:\/\/\S+$/i.test(label) || label.length > 72) link.textContent=compactExternalLinkLabel(target);
   });
 }
+function linkifyArtifacts(root) {
+  if (!root || !Array.isArray(artifactRows) || !artifactRows.length) return;
+  // Map basename -> relative artifact path so a bare filename or a full path
+  // the LLM typed in prose becomes the same clickable artifact: link.
+  const byName=new Map();
+  artifactRows.forEach(a => { const n=(a.name || (a.path||'').split(/[\\/]/).pop() || '').trim(); if (n && !byName.has(n)) byName.set(n, a.path); });
+  if (!byName.size) return;
+  const names=Array.from(byName.keys()).sort((a,b)=>b.length-a.length).map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  // Optional path prefix (no whitespace/quotes) + a known basename, not part of a longer filename.
+  const rx=new RegExp('([^\\s"\'<>()]*(?:'+names.join('|')+'))(?![\\w.\\-])','g');
+  const walker=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node){
+      if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      for (let p=node.parentElement; p && p!==root; p=p.parentElement){
+        const t=p.tagName; if (t==='A' || t==='PRE') return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const targets=[]; let n; while ((n=walker.nextNode())) targets.push(n);
+  targets.forEach(node => {
+    const text=node.nodeValue; rx.lastIndex=0;
+    if (!rx.test(text)) return; rx.lastIndex=0;
+    const frag=document.createDocumentFragment(); let last=0, m;
+    while ((m=rx.exec(text))){
+      const base=m[1].split(/[\\/]/).pop(); const path=byName.get(base); if (!path) continue;
+      if (m.index>last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const a=document.createElement('a'); a.href='artifact:'+encodeURIComponent(path); a.textContent=base; frag.appendChild(a);
+      last=m.index+m[0].length;
+    }
+    if (last<text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    if (last>0) node.parentNode.replaceChild(frag, node);
+  });
+}
 function renderMarkdown(target, markdown) {
-  target.innerHTML=marked.parse(String(markdown || '')); decorateRenderedLinks(target);
+  target.innerHTML=marked.parse(String(markdown || '')); decorateRenderedLinks(target); linkifyArtifacts(target);
 }
 function renderStepContext(body, step, options = {}) {
   if (body.querySelector('.agent-step-title')) return;
@@ -1096,7 +1130,11 @@ async function fetchArtifactRows() {
   const rows=await response.json(); artifactRows=Array.isArray(rows) ? rows : []; return artifactRows;
 }
 async function loadInlineArtifacts(body) {
-  try { const rows=await fetchArtifactRows(); renderArtifactList(rows); renderArtifactRail(body, rows); } catch (_) {}
+  try {
+    const rows=await fetchArtifactRows(); renderArtifactList(rows); renderArtifactRail(body, rows);
+    // Rows may arrive after prose already rendered (streaming / final); relink now.
+    stream.querySelectorAll('.agent-text.md').forEach(el => linkifyArtifacts(el));
+  } catch (_) {}
 }
 function renderArtifactList(rows) {
   const el=$('artList'); el.innerHTML='';

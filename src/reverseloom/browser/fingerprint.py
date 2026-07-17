@@ -371,7 +371,8 @@ async () => {
 
     @classmethod
     def save_live_fingerprint_artifact(cls, session_id: str, fingerprint: Dict[str, Any]) -> str:
-        session_dir = os.path.join(SESSION_BASE_DIR, session_id or "default")
+        from reverseloom.runtime.config import artifact_dir as _artifact_dir
+        session_dir = _artifact_dir(session_id or "default")
         os.makedirs(session_dir, exist_ok=True)
         artifact_path = os.path.join(session_dir, cls.BROWSER_FINGERPRINT_ARTIFACT)
         payload = {"fingerprint": dict(fingerprint or {})}

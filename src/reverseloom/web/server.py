@@ -509,7 +509,6 @@ def create_app() -> FastAPI:
                     "event_emitter": _emit,
                     "runtime_context": {
                         "artifact_dir": artifact_directory,
-                        "artifact_base_dir": artifact_directory,
                         "session_id": run_session_id,
                         "user_id": config.cookie_user_id(run_session_id),
                     },

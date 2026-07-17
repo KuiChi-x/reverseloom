@@ -132,8 +132,7 @@ Set `timeout_seconds` according to the expected run. Keep stdout to progress sum
 - `REVERSELOOM_ARTIFACT_DIR`;
 - `python` / `python3` on `PATH` resolve to reverseloom's own interpreter (with bundled deps such as `curl_cffi`) in every install mode; `REVERSELOOM_PYTHON_PATH` also points to it;
 - `REVERSELOOM_NODE_PATH` when Patchright's bundled Node is available;
-- `REVERSELOOM_SANDBOX_BUNDLE` when the reverse sandbox bundle is packaged;
-- `NODE_PATH` for the bundled sandbox runtime.
+- `NODE_PATH` for the bundled sandbox runtime (mount the engine itself via `run_shell(runtime_files=["reverseloom-sandbox.bundle.js"])`).
 
 ## Completion criteria
 
