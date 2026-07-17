@@ -134,14 +134,17 @@ class FingerprintManager:
             pass
 
     @classmethod
-    def get_launch_args(cls, fingerprint: Fingerprint) -> List[str]:
-        return [
+    def get_launch_args(cls, fingerprint: Fingerprint, trace_dir: str = "") -> List[str]:
+        args = [
             f"--fp-seed={fingerprint.seed}",
             f"--fp-timezone={fingerprint.timezone}",
             f"--fp-platform={fingerprint.platform}",
             "--disable-infobars",
             "--start-maximized",
         ]
+        if trace_dir:
+            args.append(f"--fp-native-trace-dir={trace_dir}")
+        return args
 
     @classmethod
     def get_live_fingerprint_js(cls) -> str:

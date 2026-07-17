@@ -74,7 +74,8 @@ class BrowserManager:
 
         # 3. Launch browser with a PERSISTENT context for per-session isolation.
         executable_path = resolve_browser_executable(BROWSER_EXECUTABLE_PATH)
-        launch_args = FingerprintManager.get_launch_args(fingerprint)
+        trace_dir = os.path.join(SESSION_BASE_DIR, session_id, "_native_trace")
+        launch_args = FingerprintManager.get_launch_args(fingerprint, trace_dir=trace_dir)
         user_data_dir = os.path.join(SESSION_BASE_DIR, session_id, "profile")
         os.makedirs(user_data_dir, exist_ok=True)
 

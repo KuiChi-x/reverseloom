@@ -330,6 +330,22 @@ When setup/patches fail before target execution:
 
 ---
 
+## Stuck rebuilding the environment? Use the native trace
+
+When `todo`-driven patching has stalled — the `todo` keeps surfacing new missing
+APIs, or `result` stays wrong for no visible reason — stop guessing and read the
+native binding trace of the real run (captured automatically; radar-browser only).
+It gives you two things: (A) the plaintext pre-image bytes fed into each
+hash/serialize sink — reproduce those and the hash matches, often solving it
+outright — and (B) the concrete scalar every native read returned on the spoofed
+browser, which is what your sandbox must return. Read
+`references/native-binding-trace.md` for the record schema and how to pull both
+signals with `run_shell`. If no trace files exist, continue with normal patching.
+You never decide whether to enable it — the trace is captured automatically when
+supported.
+
+---
+
 ## Operational Notes
 
 - `run_shell` returns exit code and bounded combined output —
