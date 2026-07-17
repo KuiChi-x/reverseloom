@@ -240,7 +240,7 @@ async def visual_locate(target_id: str, targets: List[str], **kwargs):
 
         from reverseloom.agent.build import build_llm
         llm_structured = build_llm().with_structured_output(
-            LocatedPoints, method="json_schema"
+            LocatedPoints, method="json_schema", strict=False
         )
 
         system_text, user_text = _build_prompt(targets, effective_bbox, context_bbox)
