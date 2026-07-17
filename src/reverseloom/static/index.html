@@ -385,7 +385,6 @@
       <span class="title" id="topTitle">新会话</span>
       <span class="sub" id="topSub">浏览器逆向工程</span>
       <span class="grow"></span>
-      <button class="abtn" id="btnArt">▤ 产物</button>
     </div>
     <div id="scroll"><div class="col" id="stream"></div></div>
     <button class="jump-latest" id="jumpLatest" type="button" hidden>↓ 回到底部</button>
@@ -427,13 +426,12 @@
     </div>
   </div>
 
-  <!-- artifact drawer -->
+  <!-- artifact preview (opened from inline 本轮产物 cards; no global product panel) -->
   <div class="modal modal-art" id="artModal" role="dialog" aria-label="产物预览">
     <div class="mhead">
-      <button id="artBack" hidden>← 返回</button><span class="mt" id="artTitle">产物</span><span class="grow"></span>
+      <span class="mt" id="artTitle">产物</span><span class="grow"></span>
       <button id="artCopy" hidden>复制</button><button id="artDownload" hidden>下载</button><button class="x" id="artClose" title="关闭">✕</button>
     </div>
-    <div class="mbody" id="artList"><div class="empty">运行后在此查看产物</div></div>
     <div class="mbody artifact-preview" id="artPreview"></div>
   </div>
 
@@ -744,7 +742,14 @@ function handle(m) {
     appendTurnMeta(b, Date.now(), Date.now() - activeRunStartedAt);
     activeRunStartedAt = Number.NaN;
     lastText = null; activeStepId = '';
-    finish(); loadSessions(); void loadInlineArtifacts(b); down();
+    // Only the artifacts handed off by deliver_artifact this turn.
+    const delivered = Array.isArray(m.artifacts) ? m.artifacts : [];
+    if (delivered.length) {
+      artifactRows = mergeArtifactRows(artifactRows, delivered);
+      renderArtifactRail(b, delivered);
+      stream.querySelectorAll('.agent-text.md').forEach(el => linkifyArtifacts(el));
+    }
+    finish(); loadSessions(); down();
   } else if (m.type === 'human_assistance' || m.type === 'user_interaction') {
     pendingAssist = m.interaction_id || 'pending'; pendingInteractionOption = null;
     running = false; conn.className='dot on'; connTxt.textContent='等待回复'; taskEl.readOnly=false;
@@ -1034,28 +1039,19 @@ async function openSession(id, title) {
   sessionId = id; ignoredLiveSessions.delete(id); resetActiveRenderState();
   stream.innerHTML=''; $('topTitle').textContent = title || id;
   try {
-    const [payload, artifacts] = await Promise.all([
-      fetch(`/api/sessions/${id}/history`).then(response => response.json()),
-      fetch(`/api/sessions/${id}/artifacts`).then(response => response.json()),
-    ]);
+    const payload = await fetch(`/api/sessions/${id}/history`).then(response => response.json());
     if (loadVersion !== sessionLoadVersion || sessionId !== id) return;
-    artifactRows = Array.isArray(artifacts) ? artifacts : [];
-    renderArtifactList(artifactRows);
+    // Checkpoint only keeps the latest delivery manifest; attach those cards to
+    // the last assistant reply so history does not invent per-turn attribution.
+    artifactRows = Array.isArray(payload.delivered_artifacts) ? payload.delivered_artifacts : [];
     const messages = (Array.isArray(payload) ? payload : payload.messages || [])
       .slice().sort((left, right) => (left.seq || 0) - (right.seq || 0));
     const steps = normalizeHistoricalSteps(Array.isArray(payload) ? [] : payload.past_steps);
     const assistantMessages = messages.filter(message => message.role !== 'user');
-    const artifactBuckets = new Map();
-    artifactRows.forEach(artifact => {
-      const artifactAt = historyTime(artifact.modified_at);
-      let target = assistantMessages.find(message => {
-        const replyAt = historyTime(message.created_at);
-        return Number.isFinite(artifactAt) && Number.isFinite(replyAt) && replyAt >= artifactAt;
-      }) || assistantMessages[assistantMessages.length - 1];
-      if (!target) return;
-      const targetId = target.id || `assistant-${target.seq || 0}`;
-      const bucket = artifactBuckets.get(targetId) || []; bucket.push(artifact); artifactBuckets.set(targetId, bucket);
-    });
+    const lastAssistant = assistantMessages[assistantMessages.length - 1] || null;
+    const lastAssistantId = lastAssistant
+      ? (lastAssistant.id || `assistant-${lastAssistant.seq || 0}`)
+      : null;
     const timeline = (!Array.isArray(payload) && Array.isArray(payload.timeline) && payload.timeline.length)
       ? payload.timeline
       : [
@@ -1076,13 +1072,11 @@ async function openSession(id, title) {
         lastAgentBody = renderHistoricalReply(event, turnStartedAt);
         turnStartedAt = Number.NaN;
         const eventId = event.id || `assistant-${event.seq || 0}`;
-        renderArtifactRail(lastAgentBody, artifactBuckets.get(eventId) || []);
+        if (lastAssistantId && eventId === lastAssistantId && artifactRows.length) {
+          renderArtifactRail(lastAgentBody, artifactRows);
+        }
       }
     });
-    if (!assistantMessages.length && artifactRows.length) {
-      lastAgentBody = stream.querySelector('.turn:last-child .agent-body') || historicalAgentBody('done');
-      renderArtifactRail(lastAgentBody, artifactRows);
-    }
   } catch (_) {}
   loadSessions(); down(true);
 }
@@ -1108,6 +1102,12 @@ function artifactIcon(artifact) {
 function hasArtifactCard(path) {
   return Array.from(stream.querySelectorAll('[data-artifact-path]')).some(node => node.dataset.artifactPath === path);
 }
+function mergeArtifactRows(existing, incoming) {
+  const map=new Map();
+  (Array.isArray(existing) ? existing : []).forEach(item => { if (item?.path) map.set(item.path, item); });
+  (Array.isArray(incoming) ? incoming : []).forEach(item => { if (item?.path) map.set(item.path, item); });
+  return Array.from(map.values());
+}
 function renderArtifactRail(body, rows) {
   if (!body || !Array.isArray(rows) || !rows.length) return;
   const fresh = rows.filter(artifact => artifact?.path && !hasArtifactCard(artifact.path));
@@ -1123,44 +1123,14 @@ function renderArtifactRail(body, rows) {
   });
   rail.appendChild(head); rail.appendChild(grid); body.appendChild(rail);
 }
-async function fetchArtifactRows() {
-  if (!sessionId) return [];
-  const response=await fetch(`/api/sessions/${sessionId}/artifacts`);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const rows=await response.json(); artifactRows=Array.isArray(rows) ? rows : []; return artifactRows;
-}
-async function loadInlineArtifacts(body) {
-  try {
-    const rows=await fetchArtifactRows(); renderArtifactList(rows); renderArtifactRail(body, rows);
-    // Rows may arrive after prose already rendered (streaming / final); relink now.
-    stream.querySelectorAll('.agent-text.md').forEach(el => linkifyArtifacts(el));
-  } catch (_) {}
-}
-function renderArtifactList(rows) {
-  const el=$('artList'); el.innerHTML='';
-  if (!sessionId) { el.innerHTML='<div class="empty">先运行一个任务</div>'; return; }
-  if (!rows.length) { el.innerHTML='<div class="empty">暂无产物</div>'; return; }
-  rows.slice().reverse().forEach(artifact => {
-    const item=document.createElement('button'); item.type='button'; item.className='art'; item.dataset.artifactPath=artifact.path;
-    item.innerHTML=`<div class="ic">${artifactIcon(artifact)}</div><div style="min-width:0"><div class="ap">${esc(artifact.name || artifact.path)}</div><div class="as">${artifactTypeLabel(artifact)} · ${fmtSize(artifact.size || 0)}</div></div>`;
-    item.onclick=()=>openArtifactPreview(artifact.path); el.appendChild(item);
-  });
-}
-function showArtifactList() {
-  selectedArtifact=null; $('artTitle').textContent='产物'; $('artBack').hidden=true; $('artCopy').hidden=true; $('artDownload').hidden=true;
-  $('artPreview').classList.remove('open'); $('artList').hidden=false; openModal('artModal'); void loadArtifacts();
-}
-async function loadArtifacts() {
-  try { renderArtifactList(await fetchArtifactRows()); } catch (_) { $('artList').innerHTML='<div class="empty">产物加载失败</div>'; }
-}
 function artifactEndpoint(kind, path) {
   return `/api/sessions/${encodeURIComponent(sessionId)}/artifact/${kind}?path=${encodeURIComponent(path)}`;
 }
 async function openArtifactPreview(path) {
   if (!sessionId || !path) return;
   selectedArtifact=artifactRows.find(item => item.path === path) || {path, name:path, content_type:'text', size:0};
-  $('artTitle').textContent=selectedArtifact.name || selectedArtifact.path; $('artBack').hidden=false; $('artCopy').hidden=true; $('artDownload').hidden=false;
-  $('artList').hidden=true; const previewEl=$('artPreview'); previewEl.classList.add('open'); previewEl.innerHTML='<div class="artifact-preview-loading">正在加载产物预览…</div>'; openModal('artModal');
+  $('artTitle').textContent=selectedArtifact.name || selectedArtifact.path; $('artCopy').hidden=true; $('artDownload').hidden=false;
+  const previewEl=$('artPreview'); previewEl.classList.add('open'); previewEl.innerHTML='<div class="artifact-preview-loading">正在加载产物预览…</div>'; openModal('artModal');
   try {
     const response=await fetch(artifactEndpoint('preview', path));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1313,8 +1283,6 @@ $('btnNew').onclick = newSession;
 $('btnGear').onclick = openSettings;
 $('setSave').onclick = saveSettings;
 $('setReset').onclick = resetSettingsGroup;
-$('btnArt').onclick = showArtifactList;
-$('artBack').onclick = showArtifactList;
 $('artCopy').onclick = copySelectedArtifact;
 $('artDownload').onclick = () => { if (selectedArtifact?.path) void openExternalUrl(new URL(`/api/sessions/${encodeURIComponent(sessionId)}/artifact?path=${encodeURIComponent(selectedArtifact.path)}`, location.href).href); };
 $('setClose').onclick = $('artClose').onclick = $('scrim').onclick = closeModal;

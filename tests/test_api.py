@@ -90,6 +90,7 @@ def test_session_and_history_endpoints():
         assert hist["messages"][0]["content"] == "hi"
         assert isinstance(hist["messages"][0]["created_at"], str)
         assert hist["past_steps"] == []
+        assert hist["delivered_artifacts"] == []
         assert c.post("/api/sessions/demo/rename", json={"title": "x"}).json() == {"ok": True}
         assert c.delete("/api/sessions/demo").json() == {"ok": True}
         assert c.get("/api/sessions").json() == []
@@ -186,27 +187,61 @@ def test_artifact_preview_supports_text_and_inline_metadata(tmp_path):
     artifact.write_text("# Report\n\nUseful result", encoding="utf-8")
 
     with TestClient(app) as client:
-        rows = client.get("/api/sessions/preview-session/artifacts").json()
+        # Listing only surfaces deliver_artifact handoffs; bare files stay hidden.
+        assert client.get("/api/sessions/preview-session/artifacts").json() == []
         preview = client.get(
             "/api/sessions/preview-session/artifact/preview",
             params={"path": "report.md"},
         ).json()
 
-    assert rows == [
-        {
-            "path": "report.md",
-            "name": "report.md",
-            "size": artifact.stat().st_size,
-            "modified_at": rows[0]["modified_at"],
-            "content_type": "markdown",
-            "mime_type": "text/markdown",
-            "previewable": True,
-        }
-    ]
     assert preview["previewable"] is True
     assert preview["content_type"] == "markdown"
     assert preview["artifact_content"].startswith("# Report")
     assert preview["truncated"] is False
+
+
+def test_list_artifacts_only_shows_delivered_manifest(monkeypatch, tmp_path):
+    """Chat product rail must use deliver_artifact handoff, not delivery_status
+    drafts / system captures such as browser_fingerprint.json."""
+    from reverseloom.runtime import config
+    from reverseloom.web.server import app
+
+    session_id = "delivered-session"
+    monkeypatch.setattr(config, "artifact_dir", lambda sid: str(tmp_path / sid))
+    artifact_dir = Path(config.artifact_dir(session_id))
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+
+    crawler = artifact_dir / "crawler.py"
+    crawler.write_text("print('ok')\n", encoding="utf-8")
+    fingerprint = artifact_dir / "browser_fingerprint.json"
+    fingerprint.write_text('{"fingerprint": {}}', encoding="utf-8")
+
+    class FakeCheckpointer:
+        async def aget_tuple(self, config):
+            assert config == {
+                "configurable": {"thread_id": session_id, "checkpoint_ns": ""}
+            }
+            return SimpleNamespace(checkpoint={
+                "channel_values": {
+                    "current_delivery_manifest": [{
+                        "path": str(crawler.resolve()),
+                        "summary": "Standalone crawler",
+                        "tags": ["kind:deliverable"],
+                        "producer": "agent",
+                    }],
+                    # System captures may still sit in delivery_status, but must not
+                    # surface through the user-facing artifacts list.
+                }
+            })
+
+    with TestClient(app) as client:
+        client.app.state.checkpointer = FakeCheckpointer()
+        rows = client.get(f"/api/sessions/{session_id}/artifacts").json()
+        history = client.get(f"/api/sessions/{session_id}/history").json()
+
+    assert [row["path"] for row in rows] == ["crawler.py"]
+    assert all(row["name"] != "browser_fingerprint.json" for row in rows)
+    assert [row["path"] for row in history["delivered_artifacts"]] == ["crawler.py"]
 
 
 def test_artifact_raw_returns_inline_content_with_detected_media_type(monkeypatch, tmp_path):

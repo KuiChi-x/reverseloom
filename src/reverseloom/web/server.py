@@ -22,8 +22,6 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 
-from graphloom.util.session_store import session_store
-
 from reverseloom.runtime import config
 from reverseloom.runtime import settings as settings_io
 from reverseloom.runtime.checkpoints import CheckpointerManager
@@ -230,16 +228,28 @@ def create_app() -> FastAPI:
     async def session_history(session_id: str, request: Request):
         checkpointer = getattr(request.app.state, "checkpointer", None)
         if checkpointer is None:
-            return JSONResponse({"messages": [], "past_steps": [], "timeline": []})
+            return JSONResponse({
+                "messages": [],
+                "past_steps": [],
+                "timeline": [],
+                "delivered_artifacts": [],
+            })
         checkpoint = await checkpointer.aget_tuple({
             "configurable": {"thread_id": session_id, "checkpoint_ns": ""}
         })
         values = (checkpoint.checkpoint.get("channel_values") or {}) if checkpoint else {}
         timeline = list(values.get("events", []) or [])
+        # Latest agent delivery only (finish node copies current_delivery_manifest
+        # into approved_artifact_manifest). Attach to the last assistant reply in UI.
+        delivered = _manifest_artifacts(
+            session_id,
+            list(values.get("current_delivery_manifest") or values.get("approved_artifact_manifest") or []),
+        )
         return JSONResponse({
             "messages": [event for event in timeline if event.get("type") == "message"],
             "past_steps": [event.get("step") for event in timeline if event.get("type") == "step"],
             "timeline": timeline,
+            "delivered_artifacts": delivered,
         })
 
     @app.post("/api/sessions/{session_id}/rename")
@@ -328,36 +338,60 @@ def create_app() -> FastAPI:
             "previewable": content_type != "binary",
         }
 
-    @app.get("/api/sessions/{session_id}/artifacts")
-    async def list_artifacts(session_id: str):
-        """List the session's curated artifacts (registered in delivery_status),
-        not raw scratch files. Mirrors what deliver_artifact would hand off:
-        write_artifact outputs, dumps, and mounted runtime dependencies — while
-        excluding process scratch (probes, logs, .pyc, todo.md) that tools like
-        write_file / run_shell drop into the same working directory."""
+    def _manifest_artifacts(session_id: str, manifest: list | None) -> list[Dict[str, Any]]:
+        """Normalize a delivery/approved manifest into UI artifact cards.
+
+        Only files the agent actually handed off via deliver_artifact should reach
+        the chat rail — never the full delivery_status registry (which also holds
+        system captures like browser_fingerprint.json and draft dumps).
+        """
         base = os.path.abspath(config.artifact_dir(session_id))
-        if not os.path.isdir(base):
-            return JSONResponse([])
-        delivery_status = session_store.get(session_id, "delivery_status", {}) or {}
-        out = []
-        seen = set()
-        for entry in delivery_status.values():
-            raw_path = str((entry or {}).get("path") or "").strip()
+        out: list[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for raw in list(manifest or []):
+            if not isinstance(raw, dict):
+                continue
+            raw_path = str(raw.get("path") or "").strip()
             if not raw_path:
                 continue
             target = os.path.realpath(raw_path)
             if target in seen or not os.path.isfile(target):
+                continue
+            try:
+                if os.path.commonpath([base, target]) != base:
+                    continue
+            except ValueError:
                 continue
             seen.add(target)
             try:
                 meta = artifact_metadata(base, target)
             except OSError:
                 continue
-            meta["tags"] = list((entry or {}).get("tags") or [])
-            meta["summary"] = str((entry or {}).get("summary") or "")
+            meta["summary"] = str(raw.get("summary") or "")
+            meta["tags"] = [str(tag) for tag in (raw.get("tags") or [])]
+            meta["producer"] = str(raw.get("producer") or "")
             out.append(meta)
-        out.sort(key=lambda item: (item["modified_at"], item["path"]))
-        return JSONResponse(out[:500])
+        out.sort(key=lambda item: (item.get("modified_at") or "", item.get("path") or ""))
+        return out
+
+    @app.get("/api/sessions/{session_id}/artifacts")
+    async def list_artifacts(session_id: str, request: Request):
+        """List only artifacts the agent delivered via deliver_artifact.
+
+        Does not expose the full delivery_status registry (drafts, dumps, and
+        system runtime files such as browser_fingerprint.json).
+        """
+        checkpointer = getattr(request.app.state, "checkpointer", None)
+        if checkpointer is None:
+            return JSONResponse([])
+        checkpoint = await checkpointer.aget_tuple({
+            "configurable": {"thread_id": session_id, "checkpoint_ns": ""}
+        })
+        values = (checkpoint.checkpoint.get("channel_values") or {}) if checkpoint else {}
+        return JSONResponse(_manifest_artifacts(
+            session_id,
+            list(values.get("current_delivery_manifest") or values.get("approved_artifact_manifest") or []),
+        ))
 
     @app.get("/api/sessions/{session_id}/artifact/preview")
     async def preview_artifact(session_id: str, path: str):
@@ -563,7 +597,19 @@ def create_app() -> FastAPI:
                         or final_reply
                         or "".join(streamed_reply_parts)
                     ).strip()
-                    await _send_run(run_session_id, {"type": "final", "text": final_reply or "(no final reply)"})
+                    delivered_artifacts = _manifest_artifacts(
+                        run_session_id,
+                        list(
+                            vals.get("current_delivery_manifest")
+                            or vals.get("approved_artifact_manifest")
+                            or []
+                        ),
+                    )
+                    await _send_run(run_session_id, {
+                        "type": "final",
+                        "text": final_reply or "(no final reply)",
+                        "artifacts": delivered_artifacts,
+                    })
             except asyncio.CancelledError:
                 await _send_run(run_session_id, {"type": "paused", "text": "已暂停"})
             except Exception as exc:
