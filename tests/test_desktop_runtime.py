@@ -181,8 +181,11 @@ def test_release_workflow_builds_windows_and_both_macos_architectures():
     assert "reverseloom_win.zip" in workflow
     assert "reverseloom_macos_arm64.zip" in workflow
     assert "reverseloom_macos_x86_64.zip" in workflow
-    assert 'python_version: "3.11.9"' in workflow
-    assert workflow.count('python_version: "3.11.15"') == 2
+    assert workflow.count('python_version: "3.11.9"') == 3
+    assert "actions/checkout@v5" in workflow
+    assert "actions/setup-python@v6" in workflow
+    assert "actions/upload-artifact@v7" in workflow
+    assert "actions/download-artifact@v8" in workflow
 
 
 def test_macos_crawler_runtime_download_is_pinned():

@@ -24,14 +24,14 @@ jobs:
             archive: reverseloom_win.zip
           - runner: macos-15
             platform: macos
-            python_version: "3.11.15"
+            python_version: "3.11.9"
             pybin_arch: arm64
             mac_arch: arm64
             artifact: reverseloom-macos-arm64
             archive: reverseloom_macos_arm64.zip
           - runner: macos-15-intel
             platform: macos
-            python_version: "3.11.15"
+            python_version: "3.11.9"
             pybin_arch: x86_64
             mac_arch: x86_64
             artifact: reverseloom-macos-x86_64
@@ -40,9 +40,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python_version }}
 
@@ -87,7 +87,7 @@ jobs:
           "$PYBIN" -c "import bs4, curl_cffi, parsel, Crypto, dateutil"
           ditto -c -k --sequesterRsrc --keepParent dist/ReverseLoom.app "dist/${{ matrix.archive }}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.archive }}
@@ -100,7 +100,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: release
           merge-multiple: true
