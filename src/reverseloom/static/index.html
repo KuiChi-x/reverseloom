@@ -74,6 +74,10 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
   .top .sub { font-size: 12px; color: var(--ink-3); }
   .top .grow { flex: 1; }
+  .language-switch { flex: none; display: inline-flex; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+  .language-switch button { min-width: 34px; height: 26px; padding: 0 7px; border: 0; border-radius: 5px; background: transparent; color: var(--ink-3); cursor: pointer; font: 11px var(--font); }
+  .language-switch button:hover { color: var(--ink); }
+  .language-switch button.active { background: var(--raised); color: var(--accent); }
   .top .abtn { padding: 6px 13px; border-radius: 8px; border: 1px solid var(--line); background: transparent;
     color: var(--ink-2); cursor: pointer; font-family: var(--font); font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
   .top .abtn:hover { border-color: var(--accent); color: var(--accent); }
@@ -370,7 +374,7 @@
       <div class="logo-txt">reverse<b>loom</b></div>
     </div>
     <button class="new-btn" id="btnNew">＋ 新会话</button>
-    <div class="side-label">会话</div>
+    <div class="side-label" id="sideLabel">会话</div>
     <div class="sess-list" id="sessList"><div class="empty">还没有会话</div></div>
     <div class="side-foot">
       <div class="dot" id="conn"></div>
@@ -385,6 +389,9 @@
       <span class="title" id="topTitle">新会话</span>
       <span class="sub" id="topSub">浏览器逆向工程</span>
       <span class="grow"></span>
+      <div class="language-switch" id="languageSwitch" role="group" aria-label="语言">
+        <button type="button" data-language="zh-CN">中</button><button type="button" data-language="en">EN</button>
+      </div>
     </div>
     <div id="scroll"><div class="col" id="stream"></div></div>
     <button class="jump-latest" id="jumpLatest" type="button" hidden>↓ 回到底部</button>
@@ -397,7 +404,7 @@
           <button class="send" id="send" title="运行">➤</button>
         </div>
         <div class="attachment-tray" id="attachmentTray"></div>
-        <div class="disclaimer">reverseloom 生成的内容可能有误，请注意甄别。仅用于已获授权的目标。</div>
+        <div class="disclaimer" id="disclaimer">reverseloom 生成的内容可能有误，请注意甄别。仅用于已获授权的目标。</div>
       </div>
     </div>
   </div>
@@ -407,7 +414,7 @@
   <div class="modal modal-set" id="setModal">
     <div class="settings-head">
       <div class="settings-mark">⌘</div>
-      <div><div class="settings-title">配置中心</div><div class="settings-subtitle">runtime.settings / local profile</div></div>
+      <div><div class="settings-title" id="settingsTitle">配置中心</div><div class="settings-subtitle">runtime.settings / local profile</div></div>
       <button class="x" id="setClose" title="关闭">✕</button>
     </div>
     <div class="settings-shell">
@@ -439,6 +446,77 @@
 const $ = (id) => document.getElementById(id);
 const stream = $('stream'), scroll = $('scroll'), conn = $('conn'), connTxt = $('connTxt'), jumpLatest = $('jumpLatest');
 const taskEl = $('task'), sendBtn = $('send'), attachBtn = $('attachBtn'), attachInput = $('attachInput'), attachmentTray = $('attachmentTray');
+const I18N = {
+  'zh-CN': {
+    language:'语言', newSession:'新会话', sessions:'会话', noSessions:'还没有会话', connecting:'连接中…', settings:'设置',
+    reverseEngineering:'浏览器逆向工程', latest:'↓ 回到底部', attach:'添加图片或 PDF', taskPlaceholder:'贴网址、字段要求，描述逆向任务…（Ctrl+Enter 运行）', run:'运行',
+    disclaimer:'reverseloom 生成的内容可能有误，请注意甄别。仅用于已获授权的目标。', settingsTitle:'配置中心', close:'关闭', resetDefaults:'恢复本页默认',
+    settingsDefault:'配置保存到 .env。修改后请重启生效。', saveSettings:'保存配置', artifactPreview:'产物预览', artifact:'产物', copy:'复制', download:'下载',
+    heroTitle:'逆向 · 抓包 · 复现', heroSub:'贴上网址和字段，追踪签名/token 生成，交付独立请求。', thinking:'正在思考…', thought:'已思考', understanding:'正在理解任务…',
+    noResult:'(无返回内容)', running:'执行中', awaitingReply:'等待回复', assistance:'⚠ Agent 需要你的选择或协助', moreInfo:'请补充信息…', chooseOption:'请选择一个选项…',
+    chooseOrReply:'请选择，或回复 Agent 后继续…', paused:'已暂停', pendingConfig:'待配置', disconnected:'已断开', connected:'已连接', connectionFailed:'连接失败',
+    processing:'正在处理', uploading:'正在上传附件', uploadFailed:'附件上传失败', removeAttachment:'移除附件', image:'图片', analyzeAttachments:'请分析这些附件。', unnamed:'未命名',
+    switchConfirm:'当前任务仍在运行。确认终止当前任务并切换会话？', configFirst:'请先完成模型配置后再开始任务。', openSettings:'去配置', historyFailed:'历史加载失败',
+    noHistory:'此会话没有可恢复的历史（checkpoint 缺失或尚未写入）。可继续在本会话发送新消息，或删除后新建。', text:'文本', file:'文件', turnArtifacts:'本轮产物', previewArtifact:'预览产物',
+    loadingPreview:'正在加载产物预览…', unsupportedPreview:'当前文件不支持在线预览，可使用右上角下载。', truncatedPreview:'文件较大，当前仅展示前 512 KB；完整内容请下载。', previewFailed:'预览失败', copied:'已复制',
+    settingsSections:'CONFIG SECTIONS', enabled:'已启用', disabled:'已关闭', afterRestart:'重启后', afterReconnect:'重连后', immediate:'即时', readingSettings:'正在读取本地配置…',
+    settingsLocation:'配置保存到 .env；浏览器、上下文和存储类参数需重启后生效。', readSettingsFailed:'读取配置失败', defaultsRestored:'已恢复本页默认值，点击保存后生效。', saving:'正在保存…',
+    saveFailed:'保存失败', savedRestart:'已保存，请重启后生效。', saved:'配置已保存。', today:'今天', yesterday:'昨天', second:'秒', minute:'分', minutes:'分钟', elapsed:'耗时'
+  },
+  en: {
+    language:'Language', newSession:'New session', sessions:'Sessions', noSessions:'No sessions yet', connecting:'Connecting…', settings:'Settings',
+    reverseEngineering:'Browser reverse engineering', latest:'↓ Jump to latest', attach:'Add images or PDFs', taskPlaceholder:'Paste a URL and describe the reverse-engineering task… (Ctrl+Enter to run)', run:'Run',
+    disclaimer:'reverseloom may make mistakes. Verify its output and use it only on authorized targets.', settingsTitle:'Settings', close:'Close', resetDefaults:'Reset section defaults',
+    settingsDefault:'Configuration is saved to .env. Restart after making changes.', saveSettings:'Save settings', artifactPreview:'Artifact preview', artifact:'Artifact', copy:'Copy', download:'Download',
+    heroTitle:'Reverse · Inspect · Reproduce', heroSub:'Provide a URL and fields to trace signature/token generation and produce a standalone request.', thinking:'Thinking…', thought:'Thought process', understanding:'Understanding the task…',
+    noResult:'(no output)', running:'Running', awaitingReply:'Awaiting reply', assistance:'⚠ Agent needs your choice or assistance', moreInfo:'Add more information…', chooseOption:'Choose an option…',
+    chooseOrReply:'Choose an option or reply to continue…', paused:'Paused', pendingConfig:'Setup required', disconnected:'Disconnected', connected:'Connected', connectionFailed:'Connection failed',
+    processing:'Processing', uploading:'Uploading attachments', uploadFailed:'Attachment upload failed', removeAttachment:'Remove attachment', image:'Image', analyzeAttachments:'Please analyze these attachments.', unnamed:'Untitled',
+    switchConfirm:'A task is still running. Stop it and switch sessions?', configFirst:'Configure the model before starting a task.', openSettings:'Open settings', historyFailed:'History failed to load',
+    noHistory:'This session has no recoverable history because its checkpoint is missing or has not been written. You can continue here or delete it and start again.', text:'Text', file:'File', turnArtifacts:'Artifacts', previewArtifact:'Preview artifact',
+    loadingPreview:'Loading artifact preview…', unsupportedPreview:'This file cannot be previewed here. Use Download in the top right.', truncatedPreview:'This file is large. Only the first 512 KB is shown; download it for the complete content.', previewFailed:'Preview failed', copied:'Copied',
+    settingsSections:'CONFIG SECTIONS', enabled:'Enabled', disabled:'Disabled', afterRestart:'After restart', afterReconnect:'After reconnect', immediate:'Immediate', readingSettings:'Reading local settings…',
+    settingsLocation:'Configuration is saved to .env. Browser, context, and storage changes take effect after restart.', readSettingsFailed:'Could not read settings', defaultsRestored:'Section defaults restored. Save to apply them.', saving:'Saving…',
+    saveFailed:'Save failed', savedRestart:'Saved. Restart to apply the changes.', saved:'Settings saved.', today:'Today', yesterday:'Yesterday', second:'s', minute:'m ', minutes:'min', elapsed:'Elapsed'
+  }
+};
+const EN_TEXT = {
+  '模型服务':'Model service', '配置 OpenAI 兼容接口和多模态模型。':'Configure an OpenAI-compatible endpoint and multimodal model.',
+  'LiteLLM 协议':'LiteLLM protocol', '选择 LiteLLM 供应商或 Responses 协议前缀。':'Choose a LiteLLM provider or Responses protocol prefix.', 'OpenAI / 兼容网关':'OpenAI / compatible gateway',
+  '思考强度':'Reasoning effort', 'low/medium/high/xhigh/max；Anthropic 会映射为内置 thinking budget。留空表示不强制思考。':'low/medium/high/xhigh/max; Anthropic maps this to its built-in thinking budget. Leave blank to use the provider default.', '默认（不强制）':'Default (not forced)',
+  '接口地址':'Endpoint URL', 'OpenAI 兼容 API 的 base URL。':'Base URL for the OpenAI-compatible API.', '只显示遮罩值，重新输入才会覆盖。':'Existing values are masked and only replaced when re-entered.', '模型':'Model', '必须支持图像输入和流式输出。':'Must support image input and streaming output.',
+  '浏览器与隧道代理':'Browser and tunnel proxy', '指定 Chromium 内核，并通过本地认证隧道连接上游代理。':'Choose a Chromium executable and connect to an upstream proxy through a local authenticated tunnel.',
+  '浏览器可执行文件':'Browser executable', '留空时自动探测系统 Chrome、Edge、Chromium 或 Brave；也可填写可执行文件绝对路径。':'Leave blank to detect Chrome, Edge, Chromium, or Brave automatically, or enter an absolute executable path.',
+  '代理主机':'Proxy host', '远程 HTTP 代理的域名或 IP；浏览器会通过本地隧道转发。':'Domain or IP of the remote HTTP proxy; the browser connects through a local tunnel.', '代理端口':'Proxy port', '远程代理服务端口。':'Remote proxy service port.',
+  '代理用户名':'Proxy username', '由本地隧道注入 Proxy-Authorization，不直接交给 Chromium。':'Injected into Proxy-Authorization by the local tunnel, not passed directly to Chromium.', '代理密码':'Proxy password', '仅保存在本地 .env，界面中始终遮罩。':'Stored only in the local .env file and always masked in the UI.',
+  '登录态共享':'Login session sharing', '共享：登录一次，所有对话复用登录态；隔离：每个对话独立登录（适合多账号）。共享模式下登出或失效的 Cookie 不会自动清除，需手动清理。':'Shared: sign in once across conversations. Isolated: sign in separately for each conversation. Clear expired shared cookies manually.',
+  '共享（登录一次到处用）':'Shared (sign in once)', '隔离（每对话独立登录）':'Isolated (per conversation)',
+  '模型上下文':'Model context', '仅配置当前模型的上下文容量；压缩策略由系统统一管理。':"Set the current model's context capacity; compression is managed by the system.", '模型上下文窗口':'Model context window', '应与当前模型实际支持的 context window 一致。':'Must match the context window supported by the current model.',
+  '存储与运行':'Storage and runtime', '配置会话目录、数据库后端和日志级别。':'Configure the database backend and log level.', '数据库后端':'Database backend', 'SQLite 适合本地使用；PostgreSQL 适合多实例部署。':'SQLite suits local use; PostgreSQL suits multi-instance deployments.',
+  'SQLite (推荐)':'SQLite (recommended)', 'SQLite 文件':'SQLite file', '留空时使用 ~/.reverseloom/reverseloom.sqlite3。':'Leave blank to use ~/.reverseloom/reverseloom.sqlite3.', '仅在数据库后端为 PostgreSQL 时使用。':'Used only with the PostgreSQL backend.', '日志级别':'Log level', '控制服务端日志详细程度。':'Control server log verbosity.',
+  '请先在配置中心填写模型服务地址、API Key 和模型。':'Configure the model endpoint, API key, and model in Settings first.',
+  '附件为空':'The attachment is empty.', '单个附件不能超过 20 MB':'Each attachment must be 20 MB or smaller.', '仅支持 PNG、JPEG、GIF、WebP 图片和 PDF 文件':'Only PNG, JPEG, GIF, WebP, and PDF files are supported.',
+  '附件不存在或不属于当前会话':'The attachment does not exist or does not belong to this session.', '引擎加载失败：':'Engine loading failed: ', '引擎初始化失败：':'Engine initialization failed: '
+};
+const EN_TEXT_ENTRIES = Object.entries(EN_TEXT).sort((left, right) => right[0].length - left[0].length);
+function localizeText(value) {
+  const text=String(value || '');
+  if (language !== 'en') return text;
+  return EN_TEXT[text] || EN_TEXT_ENTRIES.reduce((result, [source, translated]) => result.replaceAll(source, translated), text);
+}
+function localizeSettings(data) {
+  if (language !== 'en') return data;
+  (data?.groups || []).forEach(group => {
+    group.label=localizeText(group.label); group.description=localizeText(group.description);
+    (group.fields || []).forEach(field => {
+      field.label=localizeText(field.label); field.description=localizeText(field.description);
+      (field.options || []).forEach(option => { option.label=localizeText(option.label); });
+    });
+  });
+  return data;
+}
+let language = (() => { try { const saved=localStorage.getItem('reverseloom-language'); if (saved === 'en' || saved === 'zh-CN') return saved; } catch (_) {} return navigator.language?.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en'; })();
+const t = key => I18N[language][key] || I18N['zh-CN'][key] || key;
 let sock, sessionId = null, running = false, configRequired = false, reconnectTimer = null, curRail = null, curThink = null, curText = null, lastText = null, visibleReplyStarted = false, pendingAgent = null, activeStepId = '', pendingAssist = '', pendingInteractionOption = null;
 const ignoredLiveSessions = new Set();
 let sessionLoadVersion = 0;
@@ -469,24 +547,63 @@ jumpLatest.onclick = () => down(true);
 
 // Scenario examples: concrete, plain-language reverse-engineering tasks.
 // (category tag + one-line description — not a "task type picker")
-const CMDS = [
-  { tag: '签名', desc: '分析目标站点接口的 sign 签名是怎么算的，用 Python 独立复现',
-    task: '分析目标站点接口的 sign 签名是怎么算的，用 Python 独立复现，脱离浏览器也能跑通。\n\n目标：https://\n接口：' },
-  { tag: '加密参数', desc: '逆向接口里某个加密参数的生成逻辑，下断点读密钥和算法',
-    task: '目标接口有个加密参数（如 X-Sign / _token），定位它的生成函数，在函数处下断点读取密钥、盐值和算法，复现生成过程。\n\n目标：https://\n参数：' },
-  { tag: '纯协议爬虫', desc: '写个 Python 纯协议爬虫走接口采集数据，不用浏览器',
-    task: '写个 Python 纯协议爬虫采集目标站点的数据列表，直接走接口不依赖浏览器，需要先逆向其鉴权签名。\n\n目标：https://\n需要的数据：' },
-  { tag: '浏览器爬虫', desc: '写个 Playwright 浏览器爬虫采集数据，处理登录态和动态渲染',
-    task: '写个 Playwright 浏览器爬虫采集目标站点的数据，需要处理登录态和动态渲染的页面。\n\n目标：https://\n需要的数据：' },
-];
+const COMMANDS = {
+  'zh-CN': [
+    { tag:'签名', desc:'分析目标站点接口的 sign 签名是怎么算的，用 Python 独立复现', task:'分析目标站点接口的 sign 签名是怎么算的，用 Python 独立复现，脱离浏览器也能跑通。\n\n目标：https://\n接口：' },
+    { tag:'加密参数', desc:'逆向接口里某个加密参数的生成逻辑，下断点读密钥和算法', task:'目标接口有个加密参数（如 X-Sign / _token），定位它的生成函数，在函数处下断点读取密钥、盐值和算法，复现生成过程。\n\n目标：https://\n参数：' },
+    { tag:'纯协议爬虫', desc:'写个 Python 纯协议爬虫走接口采集数据，不用浏览器', task:'写个 Python 纯协议爬虫采集目标站点的数据列表，直接走接口不依赖浏览器，需要先逆向其鉴权签名。\n\n目标：https://\n需要的数据：' },
+    { tag:'浏览器爬虫', desc:'写个 Playwright 浏览器爬虫采集数据，处理登录态和动态渲染', task:'写个 Playwright 浏览器爬虫采集目标站点的数据，需要处理登录态和动态渲染的页面。\n\n目标：https://\n需要的数据：' },
+  ],
+  en: [
+    { tag:'Signature', desc:'Analyze an API sign parameter and reproduce it in standalone Python', task:'Analyze how the target API calculates its sign parameter. Reproduce it in standalone Python so it works without a browser.\n\nTarget: https://\nEndpoint: ' },
+    { tag:'Encrypted value', desc:'Trace an encrypted parameter and inspect its key and algorithm at runtime', task:'The target API has an encrypted parameter such as X-Sign or _token. Locate its generator, inspect the key, salt, and algorithm at runtime, and reproduce it.\n\nTarget: https://\nParameter: ' },
+    { tag:'HTTP crawler', desc:'Build a Python crawler that calls the API directly without a browser', task:'Build a Python HTTP crawler for the target data list without a browser. Reverse its authentication signature first.\n\nTarget: https://\nRequired data: ' },
+    { tag:'Browser crawler', desc:'Build a Playwright crawler that handles login and dynamic rendering', task:'Build a Playwright crawler for the target site, including login state and dynamically rendered pages.\n\nTarget: https://\nRequired data: ' },
+  ]
+};
 function resetActiveRenderState() {
   curRail = null; curThink = null; curText = null; lastText = null;
   visibleReplyStarted = false;
   pendingAgent = null; activeStepId = ''; pendingAssist = ''; pendingInteractionOption = null;
 }
+function applyLanguage() {
+  document.documentElement.lang = language;
+  $('languageSwitch').setAttribute('aria-label', t('language'));
+  $('languageSwitch').querySelectorAll('button').forEach(button => button.classList.toggle('active', button.dataset.language === language));
+  $('btnNew').textContent = '＋ ' + t('newSession');
+  $('sideLabel').textContent = t('sessions');
+  $('topSub').textContent = t('reverseEngineering');
+  jumpLatest.textContent = t('latest');
+  attachBtn.title = t('attach'); attachBtn.setAttribute('aria-label', t('attach'));
+  sendBtn.title = t('run');
+  $('disclaimer').textContent = t('disclaimer');
+  $('btnGear').title = t('settings');
+  $('settingsTitle').textContent = t('settingsTitle');
+  $('setClose').title = $('artClose').title = t('close');
+  $('setReset').textContent = t('resetDefaults');
+  $('setSave').textContent = t('saveSettings');
+  $('artModal').setAttribute('aria-label', t('artifactPreview'));
+  $('artCopy').textContent = t('copy'); $('artDownload').textContent = t('download');
+  if (!selectedArtifact) $('artTitle').textContent = t('artifact');
+  if (!sock && !configRequired) connTxt.textContent = t('connecting');
+  if (!settingsData) $('setStatus').textContent = t('settingsDefault');
+  document.querySelectorAll('.agent-connecting .wait-label').forEach(label => label.textContent = t('understanding'));
+  document.querySelectorAll('.think-head').forEach(head => { const label=head.querySelector('.tl'); if (label) label.textContent=head.classList.contains('shimmer') ? t('thinking') : t('thought'); });
+  if (!sessionId) $('topTitle').textContent = t('newSession');
+  if (!pendingAssist && !running) taskEl.placeholder = t('taskPlaceholder');
+}
+function setLanguage(nextLanguage) {
+  if (!I18N[nextLanguage] || nextLanguage === language) return;
+  language = nextLanguage;
+  try { localStorage.setItem('reverseloom-language', language); } catch (_) {}
+  applyLanguage();
+  if (document.body.classList.contains('empty')) { renderEmpty(); if (configRequired) showConfigNotice(); }
+  else loadSessions();
+  if ($('setModal').classList.contains('open')) openSettings();
+}
 function renderEmpty() {
   resetActiveRenderState();
-  $('topTitle').textContent = '新会话';
+  $('topTitle').textContent = t('newSession');
   // Park the composer in the bottom wrap first so rewriting #stream never
   // destroys it (it may currently be inside a previous hero).
   $('composerWrap').appendChild($('composerBox'));
@@ -498,8 +615,8 @@ function renderEmpty() {
     </div>
     <div class="term-body">
       <div class="term-prompt"><span class="ps">$</span> <span class="path">reverseloom</span> --start</div>
-      <h1 class="term-h1">逆向 · 抓包 · 复现<span class="term-cursor"></span></h1>
-      <p class="term-sub">贴上网址和字段，追踪签名/token 生成，交付独立请求。</p>
+      <h1 class="term-h1">${t('heroTitle')}<span class="term-cursor"></span></h1>
+      <p class="term-sub">${t('heroSub')}</p>
       <div class="term-rule">──────── protocol · breakpoint · sandbox ────────</div>
       <div class="term-composer" id="termComposer"></div>
       <div class="cmd-list" id="cmdList"></div>
@@ -508,7 +625,7 @@ function renderEmpty() {
   // Move the real composer into the terminal body so input sits with the content.
   $('termComposer').appendChild($('composerBox'));
   const cl = $('cmdList');
-  CMDS.forEach(c => { const b = document.createElement('button'); b.className = 'cmd';
+  COMMANDS[language].forEach(c => { const b = document.createElement('button'); b.className = 'cmd';
     b.innerHTML = `<span class="tag">${c.tag}</span><span class="desc">${esc(c.desc)}</span><span class="arr">↵</span>`;
     b.onclick = () => { taskEl.value = c.task; taskEl.focus(); autosize(); };
     cl.appendChild(b);
@@ -525,12 +642,12 @@ function leaveEmpty() {
 
 // Create (or reuse) a collapsible think block in body b, seeded with text.
 function startThink(b, seed) {
-  const t = document.createElement('div'); t.className='think open';
-  t.innerHTML = `<div class="think-head shimmer"><span class="ti">▌</span><span class="tl">正在思考…</span><span class="arrow">▾</span></div><div class="think-body" data-raw=""></div>`;
-  t.querySelector('.think-head').onclick = () => t.classList.toggle('open');
-  b.appendChild(t); curThink = t;
-  if (seed) { const tb = t.querySelector('.think-body'); tb.dataset.raw = seed; tb.textContent = seed; }
-  return t;
+  const think = document.createElement('div'); think.className='think open';
+  think.innerHTML = `<div class="think-head shimmer"><span class="ti">▌</span><span class="tl">${t('thinking')}</span><span class="arrow">▾</span></div><div class="think-body" data-raw=""></div>`;
+  think.querySelector('.think-head').onclick = () => think.classList.toggle('open');
+  b.appendChild(think); curThink = think;
+  if (seed) { const tb = think.querySelector('.think-body'); tb.dataset.raw = seed; tb.textContent = seed; }
+  return think;
 }
 
 function agentLine(stepId = '', isPending = false) {
@@ -572,7 +689,7 @@ function showPendingAgent() {
   const body = agentLine('', true);
   const wrap = body.closest('.turn');
   const indicator = document.createElement('div'); indicator.className = 'agent-connecting'; indicator.setAttribute('aria-live', 'polite');
-  indicator.innerHTML = '<span class="dot-wave"></span><span class="dot-wave"></span><span class="dot-wave"></span><span class="wait-label">正在理解任务…</span>';
+  indicator.innerHTML = `<span class="dot-wave"></span><span class="dot-wave"></span><span class="dot-wave"></span><span class="wait-label">${t('understanding')}</span>`;
   body.appendChild(indicator);
   pendingAgent = { wrap, body, rail: curRail, indicator };
   down();
@@ -607,7 +724,7 @@ function hasStartedVisibleReply() {
 function closeBlocks() {
   if (curThink) { curThink.classList.remove('open');
     const head = curThink.querySelector('.think-head'); head.classList.remove('shimmer');
-    head.querySelector('.tl').textContent = '已思考'; }
+    head.querySelector('.tl').textContent = t('thought'); }
   curThink = null;
 }
 function compactExternalLinkLabel(url) {
@@ -684,7 +801,7 @@ function handle(m) {
     return;
   }
   if (m.type === 'run_start') {
-    sessionId = m.session_id || sessionId; running = true; setConn('busy','执行中'); loadSessions();
+    sessionId = m.session_id || sessionId; running = true; setConn('busy',t('running')); loadSessions();
   } else if (m.type === 'ai_turn_start') {
     beginAgentTurn();
   } else if (m.type === 'step_start') {
@@ -722,9 +839,9 @@ function handle(m) {
     t.innerHTML = `<div class="tool-head"><span class="pip pending"></span><span class="tn">${esc(m.tool_name)}</span><span class="targ">${esc(args)}</span><span class="arrow">›</span></div><div class="tool-body"><pre>${esc(args)}</pre></div>`;
     t.querySelector('.tool-head').onclick = () => t.classList.toggle('open'); b.appendChild(t); down();
   } else if (m.type === 'tool_end') {
-    const t = findStepTool(m.step_id || '', m.tool_name);
-    if (t) { t.classList.add('done'); t.querySelector('.pip').className = m.has_error ? 'pip error' : 'pip done';
-      t.querySelector('.tool-body pre').textContent = '↳ ' + (m.result||'(无返回内容)'); } down();
+    const tool = findStepTool(m.step_id || '', m.tool_name);
+    if (tool) { tool.classList.add('done'); tool.querySelector('.pip').className = m.has_error ? 'pip error' : 'pip done';
+      tool.querySelector('.tool-body pre').textContent = '↳ ' + (m.result||t('noResult')); } down();
   } else if (m.type === 'step_done') {
     const rail = markRail(m.step_id || '', 'done');
     if (rail) appendTurnMeta(rail.closest('.agent-line')?.querySelector('.agent-body'), m.completed_timestamp || Date.now());
@@ -752,14 +869,14 @@ function handle(m) {
     finish(); loadSessions(); down();
   } else if (m.type === 'human_assistance' || m.type === 'user_interaction') {
     pendingAssist = m.interaction_id || 'pending'; pendingInteractionOption = null;
-    running = false; conn.className='dot on'; connTxt.textContent='等待回复'; taskEl.readOnly=false;
+    running = false; conn.className='dot on'; connTxt.textContent=t('awaitingReply'); taskEl.readOnly=false;
     sendBtn.classList.remove('stop'); sendBtn.textContent='➤'; sendBtn.disabled=false;
     const b = ensureBody(); settlePendingAgent(); closeBlocks(); curText=null;
     if (curRail) curRail.className='rail';
     const q = m.question || m.reason || m.message || m.text || '';
     const box = document.createElement('div'); box.className='agent-text';
     box.style.borderLeft='3px solid var(--think)'; box.style.paddingLeft='12px';
-    box.innerHTML = '<span style="color:var(--think)">⚠ Agent 需要你的选择或协助</span><br>' + esc(q);
+    box.innerHTML = `<span style="color:var(--think)">${t('assistance')}</span><br>` + esc(q);
     if (m.context) {
       const context = document.createElement('div'); context.className='interaction-context'; context.textContent=m.context; box.appendChild(context);
     }
@@ -772,7 +889,7 @@ function handle(m) {
         button.onclick=()=>{
           pendingInteractionOption=option;
           if (option.requires_input) {
-            taskEl.readOnly=false; taskEl.value=''; taskEl.placeholder=option.input_placeholder || m.input_placeholder || '请补充信息…'; taskEl.focus(); autosize();
+            taskEl.readOnly=false; taskEl.value=''; taskEl.placeholder=option.input_placeholder || m.input_placeholder || t('moreInfo'); taskEl.focus(); autosize();
           } else {
             taskEl.value=option.label || option.value || ''; autosize(); run();
           }
@@ -783,35 +900,35 @@ function handle(m) {
     }
     b.appendChild(box); down();
     taskEl.readOnly=m.allow_free_text === false && options.length > 0;
-    taskEl.placeholder=m.input_placeholder || (taskEl.readOnly ? '请选择一个选项…' : '请选择，或回复 Agent 后继续…');
+    taskEl.placeholder=m.input_placeholder || (taskEl.readOnly ? t('chooseOption') : t('chooseOrReply'));
     if (!taskEl.readOnly) taskEl.focus();
   } else if (m.type === 'paused') {
     const b = ensureBody(); settlePendingAgent(); closeBlocks();
     stream.querySelectorAll('.rail.active').forEach(rail => rail.className='rail');
-    running=false; conn.className='dot on'; connTxt.textContent='已暂停'; taskEl.readOnly=false;
+    running=false; conn.className='dot on'; connTxt.textContent=t('paused'); taskEl.readOnly=false;
     sendBtn.classList.remove('stop'); sendBtn.textContent='➤'; sendBtn.disabled=false;
     const e=document.createElement('div'); e.className='agent-text';
-    e.style.color='var(--ink-3)'; e.textContent='⏸ ' + (m.text||'已暂停'); b.appendChild(e); down();
+    e.style.color='var(--ink-3)'; e.textContent='⏸ ' + (m.text ? localizeText(m.text) : t('paused')); b.appendChild(e); down();
   } else if (m.type === 'config_required') {
     configRequired = true;
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
-    setConn('','待配置'); showConfigNotice(m.text);
+    m.text = localizeText(m.text); setConn('',t('pendingConfig')); showConfigNotice(m.text);
   } else if (m.type === 'error') {
     const b = ensureBody(); settlePendingAgent(); closeBlocks();
     stream.querySelectorAll('.rail.active').forEach(rail => rail.className='rail error');
     const e = document.createElement('div'); e.className='agent-text'; e.style.color='var(--err)';
-    e.textContent = '⚠ ' + m.text; b.appendChild(e); finish(); down();
+    e.textContent = '⚠ ' + localizeText(m.text); b.appendChild(e); finish(); down();
   }
 }
 function setConn(s, txt) { conn.className = 'dot' + (s ? ' '+s : ''); connTxt.textContent = txt; }
-function finish() { running = false; taskEl.readOnly=false; taskEl.placeholder='贴网址、字段要求，描述逆向任务…（Ctrl+Enter 运行）'; setConn('on','已连接'); sendBtn.classList.remove('stop'); sendBtn.textContent='➤'; sendBtn.disabled=false; }
+function finish() { running = false; taskEl.readOnly=false; taskEl.placeholder=t('taskPlaceholder'); setConn('on',t('connected')); sendBtn.classList.remove('stop'); sendBtn.textContent='➤'; sendBtn.disabled=false; }
 function createSessionId() {
   const value = globalThis.crypto?.randomUUID?.() || (Date.now().toString(16) + Math.random().toString(16).slice(2));
   return value.replace(/-/g, '').slice(0, 12);
 }
 function confirmRunningSessionSwitch(nextSessionId = null) {
   if (!running || !sessionId || nextSessionId === sessionId) return true;
-  if (!window.confirm('当前任务仍在运行。确认终止当前任务并切换会话？')) return false;
+  if (!window.confirm(t('switchConfirm'))) return false;
   const stoppingSessionId = sessionId;
   ignoredLiveSessions.add(stoppingSessionId);
   if (sock?.readyState === WebSocket.OPEN) sock.send(JSON.stringify({stop:true, session_id:stoppingSessionId}));
@@ -822,10 +939,10 @@ function confirmRunningSessionSwitch(nextSessionId = null) {
 function clearConfigNotice() {
   document.getElementById('configNotice')?.remove();
 }
-function showConfigNotice(text = '请先完成模型配置后再开始任务。') {
+function showConfigNotice(text = t('configFirst')) {
   clearConfigNotice();
   const notice=document.createElement('div'); notice.id='configNotice'; notice.className='config-notice';
-  notice.innerHTML=`<span class="config-symbol">!</span><span class="config-copy">${esc(text)}</span><button type="button">去配置</button>`;
+  notice.innerHTML=`<span class="config-symbol">!</span><span class="config-copy">${esc(text)}</span><button type="button">${t('openSettings')}</button>`;
   notice.querySelector('button').onclick=openSettings;
   const host=stream.querySelector('.term-body') || stream;
   const composer=host.querySelector('.term-composer');
@@ -839,12 +956,12 @@ function connect() {
   if (configRequired || sock?.readyState === WebSocket.OPEN || sock?.readyState === WebSocket.CONNECTING) return;
   const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   sock = new WebSocket(`${wsProtocol}//${location.host}/ws`);
-  sock.onopen = () => setConn('on','\u5df2\u8fde\u63a5');
-  sock.onerror = () => setConn('','\u8fde\u63a5\u5931\u8d25');
+  sock.onopen = () => setConn('on',t('connected'));
+  sock.onerror = () => setConn('',t('connectionFailed'));
   sock.onclose = (event) => {
     sock = null;
-    if (configRequired || event.code === 4001) { setConn('','待配置'); return; }
-    setConn('','已断开'); scheduleReconnect();
+    if (configRequired || event.code === 4001) { setConn('',t('pendingConfig')); return; }
+    setConn('',t('disconnected')); scheduleReconnect();
   };
   sock.onmessage = (e) => handle(JSON.parse(e.data));
 }
@@ -852,7 +969,7 @@ function renderPendingAttachments() {
   attachmentTray.innerHTML='';
   pendingAttachments.forEach((attachment, index) => {
     const chip=document.createElement('span'); chip.className='attachment-chip';
-    chip.innerHTML=`<span>${attachment.content_type === 'pdf' ? 'PDF' : 'IMG'}</span><span class="attachment-name">${esc(attachment.name)}</span><button type="button" aria-label="移除附件">×</button>`;
+    chip.innerHTML=`<span>${attachment.content_type === 'pdf' ? 'PDF' : 'IMG'}</span><span class="attachment-name">${esc(attachment.name)}</span><button type="button" aria-label="${t('removeAttachment')}">×</button>`;
     chip.querySelector('button').onclick=()=>{ pendingAttachments.splice(index,1); renderPendingAttachments(); };
     attachmentTray.appendChild(chip);
   });
@@ -871,7 +988,7 @@ function attachmentFileName(file, index = 0) {
 async function uploadFiles(files) {
   if (!files?.length || running) return;
   if (!sessionId) sessionId=createSessionId();
-  attachBtn.disabled=true; setConn('busy','正在上传附件');
+  attachBtn.disabled=true; setConn('busy',t('uploading'));
   try {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -880,12 +997,12 @@ async function uploadFiles(files) {
         method:'POST', headers:{'Content-Type':file.type || 'application/octet-stream'}, body:file,
       });
       const result=await response.json();
-      if (!response.ok) throw new Error(result.error || `附件上传失败：${filename}`);
+      if (!response.ok) throw new Error(localizeText(result.error) || `${t('uploadFailed')}: ${filename}`);
       pendingAttachments.push(result);
     }
-    renderPendingAttachments(); setConn('on','已连接');
+    renderPendingAttachments(); setConn('on',t('connected'));
   } catch (error) {
-    setConn('','附件上传失败'); alert(String(error.message || error));
+    setConn('',t('uploadFailed')); alert(String(error.message || error));
   } finally { attachBtn.disabled=false; attachInput.value=''; }
 }
 function collectClipboardFiles(event) {
@@ -911,7 +1028,7 @@ function collectClipboardFiles(event) {
 }
 function attachmentBubbleHtml(attachments) {
   if (!attachments.length) return '';
-  return `<div class="bubble-attachments">${attachments.map(item=>`<span class="bubble-attachment">${item.content_type === 'pdf' ? 'PDF' : '图片'} · ${esc(item.name)}</span>`).join('')}</div>`;
+  return `<div class="bubble-attachments">${attachments.map(item=>`<span class="bubble-attachment">${item.content_type === 'pdf' ? 'PDF' : t('image')} · ${esc(item.name)}</span>`).join('')}</div>`;
 }
 
 function run() {
@@ -924,12 +1041,12 @@ function run() {
   leaveEmpty();
   if (stream.querySelector('.term')) stream.innerHTML = '';
   const attachments = pendingAttachments.slice();
-  const displayTask = pendingInteractionOption ? (pendingInteractionOption.requires_input && task ? `${pendingInteractionOption.label}: ${task}` : (pendingInteractionOption.label || pendingInteractionOption.value || task)) : (task || '请分析这些附件。');
+  const displayTask = pendingInteractionOption ? (pendingInteractionOption.requires_input && task ? `${pendingInteractionOption.label}: ${task}` : (pendingInteractionOption.label || pendingInteractionOption.value || task)) : (task || t('analyzeAttachments'));
   $('topTitle').textContent = displayTask.slice(0, 40);
   activeRunStartedAt = Date.now();
   const u = document.createElement('div'); u.className='turn msg-user'; u.innerHTML = `<div class="bubble">${esc(displayTask)}${attachmentBubbleHtml(attachments)}</div>`;
   appendTurnMeta(u, activeRunStartedAt); stream.appendChild(u);
-  running = true; taskEl.readOnly = true; setConn('busy','正在处理');
+  running = true; taskEl.readOnly = true; setConn('busy',t('processing'));
   curRail = null; curText = null; lastText = null; curThink = null; visibleReplyStarted = false; activeStepId = '';
   showPendingAgent();
   // If answering a paused user interaction, resume the graph (not a new
@@ -943,7 +1060,7 @@ async function loadSessions(openLatest = false) {
   try { const rows = await (await fetch('/api/sessions')).json(); const el = $('sessList');
     const side = document.querySelector('.side');
     if (!rows.length) {
-      el.innerHTML = '<div class="empty">还没有会话</div>';
+      el.innerHTML = `<div class="empty">${t('noSessions')}</div>`;
       if (side) side.classList.add('no-sessions');
       return;
     }
@@ -954,8 +1071,8 @@ async function loadSessions(openLatest = false) {
     }
     el.innerHTML='';
     rows.forEach(s => { const d = document.createElement('div'); d.className='sess'+(s.id===sessionId?' active':'');
-      const when = formatEventTime(s.updated_at || s.created_at).replace(/^今天\s*/, '').replace(/^昨天\s*/, '昨天 ');
-      d.innerHTML = `<div class="st">${esc(s.title||'未命名')}</div><div class="sm"><span>${esc(when)}</span><span class="del">✕</span></div>`;
+      const when = formatEventTime(s.updated_at || s.created_at).replace(new RegExp(`^${t('today')}\\s*`), '').replace(new RegExp(`^${t('yesterday')}\\s*`), `${t('yesterday')} `);
+      d.innerHTML = `<div class="st">${esc(s.title||t('unnamed'))}</div><div class="sm"><span>${esc(when)}</span><span class="del">✕</span></div>`;
       d.onclick = (e) => { if (e.target.classList.contains('del')) { delSession(s.id); e.stopPropagation(); return; } openSession(s.id, s.title); };
       el.appendChild(d); });
   } catch (_) {}
@@ -974,12 +1091,12 @@ function formatEventTime(value) {
   const now=new Date();
   const dayStart=new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const eventDayStart=new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const timePart=new Intl.DateTimeFormat('zh-CN', {
+  const timePart=new Intl.DateTimeFormat(language, {
     hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
   }).format(date);
-  if (eventDayStart === dayStart) return `\u4eca\u5929 ${timePart}`;
-  if (eventDayStart === dayStart - 86400000) return `\u6628\u5929 ${timePart}`;
-  const datePart=new Intl.DateTimeFormat('zh-CN', {
+  if (eventDayStart === dayStart) return `${t('today')} ${timePart}`;
+  if (eventDayStart === dayStart - 86400000) return `${t('yesterday')} ${timePart}`;
+  const datePart=new Intl.DateTimeFormat(language, {
     month:'2-digit', day:'2-digit',
   }).format(date).replaceAll('/', '-');
   return `${datePart} ${timePart}`;
@@ -987,9 +1104,9 @@ function formatEventTime(value) {
 function formatDuration(milliseconds) {
   if (!Number.isFinite(milliseconds) || milliseconds < 0) return '';
   const seconds=Math.max(0, Math.round(milliseconds / 1000));
-  if (seconds < 60) return `${seconds}\u79d2`;
+  if (seconds < 60) return `${seconds}${t('second')}`;
   const minutes=Math.floor(seconds / 60), rest=seconds % 60;
-  return rest ? `${minutes}\u5206${rest}\u79d2` : `${minutes}\u5206\u949f`;
+  return rest ? `${minutes}${t('minute')}${rest}${t('second')}` : `${minutes}${t('minutes')}`;
 }
 function appendTurnMeta(target, timestamp, durationMs = Number.NaN) {
   if (!target) return;
@@ -999,7 +1116,7 @@ function appendTurnMeta(target, timestamp, durationMs = Number.NaN) {
   const meta=document.createElement('div'); meta.className='turn-meta';
   const parts=[];
   if (when) parts.push(`<span>${esc(when)}</span>`);
-  if (duration) parts.push(`<span class="turn-duration">\u8017\u65f6 ${esc(duration)}</span>`);
+  if (duration) parts.push(`<span class="turn-duration">${t('elapsed')} ${esc(duration)}</span>`);
   meta.innerHTML=parts.join(' \u00b7 '); target.appendChild(meta);
 }
 function renderHistoricalUser(message) {
@@ -1030,7 +1147,7 @@ function renderHistoricalStep(step) {
   renderStepContext(body, step);
   if (step.think) {
     const think=document.createElement('div'); think.className='think';
-    think.innerHTML='<div class="think-head"><span class="ti">▌</span><span class="tl">已思考</span><span class="arrow">▾</span></div><div class="think-body"></div>';
+    think.innerHTML=`<div class="think-head"><span class="ti">▌</span><span class="tl">${t('thought')}</span><span class="arrow">▾</span></div><div class="think-body"></div>`;
     think.querySelector('.think-body').textContent=String(step.think);
     think.querySelector('.think-head').onclick=()=>think.classList.toggle('open');
     body.appendChild(think);
@@ -1043,7 +1160,7 @@ function renderHistoricalStep(step) {
     const tool=document.createElement('div'); tool.className='tool done';
     const args=call?.tool_args ? JSON.stringify(call.tool_args, null, 2) : '';
     tool.innerHTML=`<div class="tool-head"><span class="pip ${call?.has_error ? 'error' : 'done'}"></span><span class="tn">${esc(call?.tool_name||'tool')}</span><span class="targ">${esc(args.slice(0,300))}</span><span class="arrow">›</span></div><div class="tool-body"><pre></pre></div>`;
-    tool.querySelector('.tool-body pre').textContent=`↳ ${call?.result || '(无返回内容)'}`;
+    tool.querySelector('.tool-body pre').textContent=`↳ ${call?.result || t('noResult')}`;
     tool.querySelector('.tool-head').onclick=()=>tool.classList.toggle('open');
     body.appendChild(tool);
   });
@@ -1076,7 +1193,7 @@ async function openSession(id, title) {
     const response = await fetch(`/api/sessions/${id}/history`);
     const payload = await response.json();
     if (loadVersion !== sessionLoadVersion || sessionId !== id) return;
-    if (!response.ok) throw new Error(payload.error || `历史加载失败 (${response.status})`);
+    if (!response.ok) throw new Error(localizeText(payload.error) || `${t('historyFailed')} (${response.status})`);
     // Checkpoint only keeps the latest delivery manifest; attach those cards to
     // the last assistant reply so history does not invent per-turn attribution.
     artifactRows = Array.isArray(payload.delivered_artifacts) ? payload.delivered_artifacts : [];
@@ -1098,7 +1215,7 @@ async function openSession(id, title) {
         ].sort((left, right) => (historyTime(left.created_at) || 0) - (historyTime(right.created_at) || 0));
     if (!timeline.length) {
       const empty=document.createElement('div'); empty.className='turn';
-      empty.innerHTML='<div class="agent-text" style="color:var(--ink-3);padding:18px 8px">此会话没有可恢复的历史（checkpoint 缺失或尚未写入）。可继续在本会话发送新消息，或删除后新建。</div>';
+      empty.innerHTML=`<div class="agent-text" style="color:var(--ink-3);padding:18px 8px">${t('noHistory')}</div>`;
       stream.appendChild(empty);
     }
     let lastAgentBody = null;
@@ -1121,7 +1238,7 @@ async function openSession(id, title) {
   } catch (error) {
     if (loadVersion !== sessionLoadVersion || sessionId !== id) return;
     const empty=document.createElement('div'); empty.className='turn';
-    empty.innerHTML=`<div class="agent-text" style="color:var(--err);padding:18px 8px">历史加载失败：${esc(String(error.message || error))}</div>`;
+    empty.innerHTML=`<div class="agent-text" style="color:var(--err);padding:18px 8px">${t('historyFailed')}: ${esc(String(error.message || error))}</div>`;
     stream.appendChild(empty);
   }
   loadSessions(); down(true);
@@ -1140,7 +1257,7 @@ function newSession() {
 
 function fmtSize(n){ return n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB'; }
 function artifactTypeLabel(artifact) {
-  return ({markdown:'Markdown',text:'文本',image:'图片',pdf:'PDF',binary:'文件'})[artifact.content_type] || '文件';
+  return ({markdown:'Markdown',text:t('text'),image:t('image'),pdf:'PDF',binary:t('file')})[artifact.content_type] || t('file');
 }
 function artifactIcon(artifact) {
   return ({markdown:'MD',text:'TXT',image:'IMG',pdf:'PDF',binary:'FILE'})[artifact.content_type] || 'FILE';
@@ -1159,11 +1276,11 @@ function renderArtifactRail(body, rows) {
   const fresh = rows.filter(artifact => artifact?.path && !hasArtifactCard(artifact.path));
   if (!fresh.length) return;
   const rail=document.createElement('div'); rail.className='inline-artifacts';
-  const head=document.createElement('div'); head.className='inline-artifacts-head'; head.textContent=`本轮产物 · ${fresh.length}`;
+  const head=document.createElement('div'); head.className='inline-artifacts-head'; head.textContent=`${t('turnArtifacts')} · ${fresh.length}`;
   const grid=document.createElement('div'); grid.className='inline-artifacts-grid';
   fresh.forEach(artifact => {
     const button=document.createElement('button'); button.type='button'; button.className='artifact-card';
-    button.dataset.artifactPath=artifact.path; button.setAttribute('aria-label', `预览产物 ${artifact.name || artifact.path}`);
+    button.dataset.artifactPath=artifact.path; button.setAttribute('aria-label', `${t('previewArtifact')} ${artifact.name || artifact.path}`);
     button.innerHTML=`<span class="artifact-card-icon">${artifactIcon(artifact)}</span><span class="artifact-card-copy"><span class="artifact-card-name">${esc(artifact.name || artifact.path)}</span><span class="artifact-card-meta">${artifactTypeLabel(artifact)} · ${fmtSize(artifact.size || 0)}</span></span><span class="artifact-card-open">↗</span>`;
     button.onclick=()=>openArtifactPreview(artifact.path); grid.appendChild(button);
   });
@@ -1176,7 +1293,7 @@ async function openArtifactPreview(path) {
   if (!sessionId || !path) return;
   selectedArtifact=artifactRows.find(item => item.path === path) || {path, name:path, content_type:'text', size:0};
   $('artTitle').textContent=selectedArtifact.name || selectedArtifact.path; $('artCopy').hidden=true; $('artDownload').hidden=false;
-  const previewEl=$('artPreview'); previewEl.classList.add('open'); previewEl.innerHTML='<div class="artifact-preview-loading">正在加载产物预览…</div>'; openModal('artModal');
+  const previewEl=$('artPreview'); previewEl.classList.add('open'); previewEl.innerHTML=`<div class="artifact-preview-loading">${t('loadingPreview')}</div>`; openModal('artModal');
   try {
     const response=await fetch(artifactEndpoint('preview', path));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1184,15 +1301,15 @@ async function openArtifactPreview(path) {
     const rawUrl=artifactEndpoint('raw', path);
     if (preview.content_type === 'image') previewEl.innerHTML=`<img class="artifact-preview-media" src="${rawUrl}" alt="${esc(preview.name || path)}">`;
     else if (preview.content_type === 'pdf') previewEl.innerHTML=`<iframe class="artifact-preview-media" src="${rawUrl}" title="${esc(preview.name || path)}"></iframe>`;
-    else if (!preview.previewable) previewEl.innerHTML='<div class="artifact-preview-empty">当前文件不支持在线预览，可使用右上角下载。</div>';
+    else if (!preview.previewable) previewEl.innerHTML=`<div class="artifact-preview-empty">${t('unsupportedPreview')}</div>`;
     else if (preview.content_type === 'markdown') { previewEl.innerHTML='<div class="artifact-preview-markdown"></div>'; renderMarkdown(previewEl.querySelector('.artifact-preview-markdown'), preview.artifact_content || ''); $('artCopy').hidden=false; }
     else { const pre=document.createElement('pre'); pre.className='artifact-preview-pre'; pre.textContent=preview.artifact_content || ''; previewEl.innerHTML=''; previewEl.appendChild(pre); $('artCopy').hidden=false; }
-    if (preview.truncated) previewEl.insertAdjacentHTML('beforeend','<div class="artifact-preview-note">文件较大，当前仅展示前 512 KB；完整内容请下载。</div>');
-  } catch (error) { previewEl.innerHTML=`<div class="artifact-preview-empty">预览失败：${esc(String(error.message || error))}</div>`; }
+    if (preview.truncated) previewEl.insertAdjacentHTML('beforeend',`<div class="artifact-preview-note">${t('truncatedPreview')}</div>`);
+  } catch (error) { previewEl.innerHTML=`<div class="artifact-preview-empty">${t('previewFailed')}: ${esc(String(error.message || error))}</div>`; }
 }
 async function copySelectedArtifact() {
   const content=selectedArtifact?.artifact_content || ''; if (!content) return;
-  try { await navigator.clipboard.writeText(content); $('artCopy').textContent='已复制'; setTimeout(()=>{$('artCopy').textContent='复制';},1200); } catch (_) {}
+  try { await navigator.clipboard.writeText(content); $('artCopy').textContent=t('copied'); setTimeout(()=>{$('artCopy').textContent=t('copy');},1200); } catch (_) {}
 }
 async function openExternalUrl(url) {
   const value=String(url || '').trim(); if (!value) return false;
@@ -1222,7 +1339,7 @@ let settingsData = null, settingsDraft = {}, settingsOriginal = {}, activeSettin
 function settingFieldControl(field) {
   const value = settingsDraft[field.key];
   if (field.type === 'switch') {
-    return `<label class="switch-control"><span>${value ? '\u5df2\u542f\u7528' : '\u5df2\u5173\u95ed'}</span><input data-key="${field.key}" type="checkbox" ${value ? 'checked' : ''}><span class="switch-track"><span class="switch-thumb"></span></span></label>`;
+    return `<label class="switch-control"><span>${value ? t('enabled') : t('disabled')}</span><input data-key="${field.key}" type="checkbox" ${value ? 'checked' : ''}><span class="switch-track"><span class="switch-thumb"></span></span></label>`;
   }
   if (field.type === 'select') {
     const options = (field.options || []).map(option => `<option value="${esc(String(option.value))}" ${String(value) === String(option.value) ? 'selected' : ''}>${esc(String(option.label))}</option>`).join('');
@@ -1237,7 +1354,7 @@ function renderSettingsGroup(groupId = activeSettingsGroup) {
   const group = settingsData?.groups.find(item => item.id === groupId) || settingsData?.groups[0];
   if (!group) return;
   activeSettingsGroup = group.id;
-  $('setTabs').innerHTML = '<div class="settings-nav-label">CONFIG SECTIONS</div>' + settingsData.groups.map((item, index) => `
+  $('setTabs').innerHTML = `<div class="settings-nav-label">${t('settingsSections')}</div>` + settingsData.groups.map((item, index) => `
     <button class="settings-tab ${item.id === group.id ? 'active' : ''}" data-group="${item.id}">
       <span class="tab-index">${String(index + 1).padStart(2, '0')}</span>
       <span><strong>${esc(item.label)}</strong><small>${esc(item.eyebrow)}</small></span>
@@ -1248,7 +1365,7 @@ function renderSettingsGroup(groupId = activeSettingsGroup) {
   $('setGroupDesc').textContent = group.description;
   $('setFields').innerHTML = group.fields.map(field => {
     const applyClass = field.restart_required ? 'restart' : (field.reconnect_required ? 'reconnect' : '');
-    const applyText = field.restart_required ? '\u91cd\u542f\u540e' : (field.reconnect_required ? '\u91cd\u8fde\u540e' : '\u5373\u65f6');
+    const applyText = field.restart_required ? t('afterRestart') : (field.reconnect_required ? t('afterReconnect') : t('immediate'));
     return `<section class="setting-card">
       <div class="setting-label-row"><label>${esc(field.label)}</label><span class="apply-badge ${applyClass}">${applyText}</span></div>
       <div class="setting-desc">${esc(field.description)}</div>
@@ -1259,23 +1376,23 @@ function renderSettingsGroup(groupId = activeSettingsGroup) {
   $('setFields').querySelectorAll('input,select').forEach(control => {
     const sync = () => {
       settingsDraft[control.dataset.key] = control.type === 'checkbox' ? control.checked : control.value;
-      if (control.type === 'checkbox') control.closest('.switch-control').firstElementChild.textContent = control.checked ? '\u5df2\u542f\u7528' : '\u5df2\u5173\u95ed';
+      if (control.type === 'checkbox') control.closest('.switch-control').firstElementChild.textContent = control.checked ? t('enabled') : t('disabled');
     };
     control.addEventListener('input', sync);
     control.addEventListener('change', sync);
   });
 }
 async function openSettings() {
-  const status = $('setStatus'); status.className = 'settings-status'; status.textContent = '\u6b63\u5728\u8bfb\u53d6\u672c\u5730\u914d\u7f6e\u2026';
+  const status = $('setStatus'); status.className = 'settings-status'; status.textContent = t('readingSettings');
   openModal('setModal');
   try {
-    settingsData = await (await fetch('/api/settings')).json();
+    settingsData = localizeSettings(await (await fetch('/api/settings')).json());
     settingsDraft = {}; settingsOriginal = {};
     settingsData.groups.forEach(group => group.fields.forEach(field => { settingsDraft[field.key] = field.value; settingsOriginal[field.key] = field.value; }));
     renderSettingsGroup(settingsData.groups.some(group => group.id === activeSettingsGroup) ? activeSettingsGroup : settingsData.groups[0]?.id);
-    status.textContent = '\u914d\u7f6e\u4fdd\u5b58\u5230 .env\uff1b\u6d4f\u89c8\u5668\u3001\u4e0a\u4e0b\u6587\u548c\u5b58\u50a8\u7c7b\u53c2\u6570\u9700\u91cd\u542f\u540e\u751f\u6548\u3002';
+    status.textContent = t('settingsLocation');
   } catch (error) {
-    status.className = 'settings-status error'; status.textContent = '\u8bfb\u53d6\u914d\u7f6e\u5931\u8d25\uff1a' + error;
+    status.className = 'settings-status error'; status.textContent = `${t('readSettingsFailed')}: ${error}`;
   }
 }
 function resetSettingsGroup() {
@@ -1283,11 +1400,11 @@ function resetSettingsGroup() {
   if (!group) return;
   group.fields.forEach(field => { settingsDraft[field.key] = field.type === 'switch' ? !['', '0', 'false'].includes(String(field.default).toLowerCase()) : field.default; });
   renderSettingsGroup(group.id);
-  $('setStatus').className = 'settings-status warn'; $('setStatus').textContent = '\u5df2\u6062\u590d\u672c\u9875\u9ed8\u8ba4\u503c\uff0c\u70b9\u51fb\u4fdd\u5b58\u540e\u751f\u6548\u3002';
+  $('setStatus').className = 'settings-status warn'; $('setStatus').textContent = t('defaultsRestored');
 }
 async function saveSettings() {
   const button = $('setSave'), status = $('setStatus');
-  button.disabled = true; button.textContent = '\u6b63\u5728\u4fdd\u5b58\u2026'; status.className = 'settings-status';
+  button.disabled = true; button.textContent = t('saving'); status.className = 'settings-status';
   const updates = {};
   Object.entries(settingsDraft).forEach(([key, value]) => {
     if (String(value) === String(settingsOriginal[key])) return;
@@ -1296,7 +1413,7 @@ async function saveSettings() {
   try {
     const response = await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(updates)});
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '\u4fdd\u5b58\u5931\u8d25');
+    if (!response.ok) throw new Error(localizeText(result.error) || t('saveFailed'));
     Object.keys(updates).forEach(key => { settingsOriginal[key] = settingsDraft[key]; });
     if (result.reconnect_required) {
       configRequired = false; clearConfigNotice();
@@ -1304,15 +1421,15 @@ async function saveSettings() {
     }
     if ((result.changed || []).length) {
       status.className = 'settings-status warn';
-      status.textContent = '\u5df2\u4fdd\u5b58\uff0c\u8bf7\u91cd\u542f\u540e\u751f\u6548\u3002';
+      status.textContent = t('savedRestart');
     } else {
       status.className = 'settings-status success';
-      status.textContent = '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002';
+      status.textContent = t('saved');
     }
   } catch (error) {
     status.className = 'settings-status error'; status.textContent = String(error.message || error);
   } finally {
-    button.disabled = false; button.textContent = '\u4fdd\u5b58\u914d\u7f6e';
+    button.disabled = false; button.textContent = t('saveSettings');
   }
 }
 
@@ -1339,8 +1456,9 @@ $('setReset').onclick = resetSettingsGroup;
 $('artCopy').onclick = copySelectedArtifact;
 $('artDownload').onclick = () => { if (selectedArtifact?.path) void openExternalUrl(new URL(`/api/sessions/${encodeURIComponent(sessionId)}/artifact?path=${encodeURIComponent(selectedArtifact.path)}`, location.href).href); };
 $('setClose').onclick = $('artClose').onclick = $('scrim').onclick = closeModal;
+$('languageSwitch').querySelectorAll('button').forEach(button => button.onclick = () => setLanguage(button.dataset.language));
 
-renderEmpty(); connect(); loadSessions();
+applyLanguage(); renderEmpty(); connect(); loadSessions();
 </script>
 </body>
 </html>

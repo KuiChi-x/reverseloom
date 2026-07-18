@@ -166,8 +166,13 @@ python3 -m venv .venv
 执行打包：
 
 ```bash
+./.venv/bin/python scripts/prepare_pybin.py build/pybin
+export REVERSELOOM_PYBIN_DIR="$PWD/build/pybin"
 ./.venv/bin/python -m PyInstaller --clean --noconfirm reverseloom-macos.spec
 ```
+
+上述运行时是可搬移 CPython，并已安装与 Windows 产物相同的爬虫依赖；App
+运行时不依赖用户电脑上的 Python 或 Python 包。
 
 输出目录：
 
@@ -203,6 +208,18 @@ macOS 下无论源码运行还是冻结后的 App，都会把配置、SQLite 数
 ```
 
 Chrome 等浏览器不会被打进 App。应用会自动探测 `/Applications` 和 `~/Applications` 下的 Chrome、Edge、Chromium、Brave，也可在配置中心填写 `.app/Contents/MacOS/` 下的真实可执行文件路径。
+
+## GitHub Release
+
+推送 `v*` 或以数字开头的版本标签后，`.github/workflows/release.yml` 会构建并上传：
+
+- `reverseloom_win.zip`
+- `reverseloom_macos_arm64.zip`
+- `reverseloom_macos_x86_64.zip`
+
+也可以在 Actions 页面手动运行该 workflow，只生成可下载的 Actions Artifacts，
+不会创建 GitHub Release。macOS 产物未经 Developer ID 签名和 notarization 时，
+首次打开仍会显示 Gatekeeper 警告。
 
 ## 常见问题
 

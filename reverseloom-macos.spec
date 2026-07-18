@@ -1,16 +1,12 @@
 # PyInstaller spec for a native macOS ReverseLoom.app bundle.
 # Build this file on macOS; PyInstaller does not cross-compile from Windows.
 import os
+import subprocess
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 block_cipher = None
-
-# NOTE: no bundled Python runtime on macOS. python.org ships no macOS
-# "embeddable" package, so agent-generated crawlers run against the user's
-# system python3 here (see README). The app itself never imports curl_cffi, so
-# nothing curl-related is bundled into the .app.
 
 target_arch = os.environ.get("REVERSELOOM_MAC_ARCH") or None
 codesign_identity = os.environ.get("REVERSELOOM_CODESIGN_IDENTITY") or None
@@ -24,6 +20,38 @@ if not os.path.isfile(sandbox_bundle):
 if not os.path.isfile(sandbox_jsdom_manifest):
     raise SystemExit("Shared jsdom runtime is missing; run npm ci --omit=dev --ignore-scripts in src/reverseloom/browser/sandbox_env before packaging")
 
+# Keep macOS release behavior aligned with Windows: agent-generated crawlers
+# run with a relocatable CPython and dependencies bundled under pybin/.
+_pybin_src = os.environ.get("REVERSELOOM_PYBIN_DIR", "").strip()
+if not _pybin_src:
+    raise SystemExit(
+        "REVERSELOOM_PYBIN_DIR is required: prepare the bundled crawler runtime "
+        "with scripts/prepare_pybin.py before building the production package."
+    )
+_pybin_exe = os.path.join(_pybin_src, "bin", "python3")
+if not os.path.isfile(_pybin_exe):
+    raise SystemExit(
+        f"REVERSELOOM_PYBIN_DIR={_pybin_src!r} has no bin/python3; "
+        "run `python scripts/prepare_pybin.py <dir>` first."
+    )
+_crawler_probe = subprocess.run(
+    [_pybin_exe, "-c", "import bs4, curl_cffi, parsel, Crypto, dateutil"],
+    capture_output=True,
+    text=True,
+)
+if _crawler_probe.returncode != 0:
+    raise SystemExit(
+        "The bundled crawler runtime is missing a required dependency; "
+        "run scripts/prepare_pybin.py again.\n"
+        f"{_crawler_probe.stderr.strip()}"
+    )
+pybin_datas = []
+for _root, _dirs, _files in os.walk(_pybin_src):
+    for _f in _files:
+        _abs = os.path.join(_root, _f)
+        _rel = os.path.relpath(_root, _pybin_src)
+        pybin_datas.append((_abs, os.path.join("pybin", _rel)))
+
 datas = [
     ("src/reverseloom/static", "reverseloom/static"),
     ("src/reverseloom/skills", "reverseloom/skills"),
@@ -33,6 +61,7 @@ datas = [
     # that collect_submodules does NOT gather; without them build_llm() raises
     # FileNotFoundError at import time.
     *collect_data_files("litellm"),
+    *pybin_datas,
 ]
 
 hiddenimports = (

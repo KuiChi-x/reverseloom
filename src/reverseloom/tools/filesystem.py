@@ -90,8 +90,8 @@ def _decode_shell_output(value: bytes | str | None) -> str:
 
 def _frozen_python_dir() -> str | None:
     """In a frozen build, sys.executable is the windowed app, not a Python
-    interpreter. The build ships a self-contained CPython (python.org
-    embeddable) under _internal/pybin/ with a real python.exe. Return that
+    interpreter. The build ships a self-contained, relocatable CPython under
+    _internal/pybin/ with a real python executable. Return that
     directory so it can be prepended to PATH; agent crawlers then call a real
     `python` that natively parses every flag and imports the bundled curl_cffi.
     Returns None if the runtime isn't present (falls back to system Python)."""

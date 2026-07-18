@@ -157,13 +157,52 @@ def test_desktop_bundle_collects_patchright_driver_without_env_file():
     assert '(".env.example"' not in spec
 
 
-def test_windows_bundle_requires_crawler_python_runtime():
-    spec_file = Path(__file__).parents[1] / "reverseloom.spec"
-    spec = spec_file.read_text(encoding="utf-8")
+def test_desktop_bundles_require_crawler_python_runtime():
+    project_root = Path(__file__).parents[1]
+    for spec_name in ("reverseloom.spec", "reverseloom-macos.spec"):
+        spec = (project_root / spec_name).read_text(encoding="utf-8")
+        assert "REVERSELOOM_PYBIN_DIR is required" in spec
+        assert "prepare the bundled crawler runtime" in spec
+        assert "import bs4, curl_cffi, parsel, Crypto, dateutil" in spec
 
-    assert "REVERSELOOM_PYBIN_DIR is required" in spec
-    assert "prepare the bundled crawler runtime" in spec
-    assert "import bs4, curl_cffi, parsel, Crypto, dateutil" in spec
+    macos_spec = (project_root / "reverseloom-macos.spec").read_text(encoding="utf-8")
+    assert '"bin", "python3"' in macos_spec
+    assert "*pybin_datas" in macos_spec
+
+
+def test_release_workflow_builds_windows_and_both_macos_architectures():
+    workflow = (
+        Path(__file__).parents[1] / ".github/workflows/release.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "windows-2022" in workflow
+    assert "macos-15-intel" in workflow
+    assert "macos-15" in workflow
+    assert "reverseloom_win.zip" in workflow
+    assert "reverseloom_macos_arm64.zip" in workflow
+    assert "reverseloom_macos_x86_64.zip" in workflow
+    assert 'python_version: "3.11.9"' in workflow
+    assert workflow.count('python_version: "3.11.15"') == 2
+
+
+def test_macos_crawler_runtime_download_is_pinned():
+    from scripts.prepare_pybin import (
+        MACOS_PYTHON_VERSION,
+        MACOS_STANDALONE_RELEASE,
+        MACOS_STANDALONE_SHA256,
+        _standalone_url,
+    )
+
+    assert MACOS_PYTHON_VERSION == "3.11.15"
+    assert MACOS_STANDALONE_RELEASE in _standalone_url(
+        MACOS_PYTHON_VERSION, "arm64"
+    )
+    assert "%2B" in _standalone_url(MACOS_PYTHON_VERSION, "arm64")
+    assert "aarch64-apple-darwin" in _standalone_url(
+        MACOS_PYTHON_VERSION, "arm64"
+    )
+    assert set(MACOS_STANDALONE_SHA256) == {"arm64", "x86_64"}
+    assert all(len(digest) == 64 for digest in MACOS_STANDALONE_SHA256.values())
 
 
 def test_desktop_bundle_collects_model_backends():

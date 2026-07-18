@@ -1,0 +1,117 @@
+name: Release desktop apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            platform: windows
+            python_version: "3.11.9"
+            pybin_arch: amd64
+            artifact: reverseloom-windows
+            archive: reverseloom_win.zip
+          - runner: macos-15
+            platform: macos
+            python_version: "3.11.15"
+            pybin_arch: arm64
+            mac_arch: arm64
+            artifact: reverseloom-macos-arm64
+            archive: reverseloom_macos_arm64.zip
+          - runner: macos-15-intel
+            platform: macos
+            python_version: "3.11.15"
+            pybin_arch: x86_64
+            mac_arch: x86_64
+            artifact: reverseloom-macos-x86_64
+            archive: reverseloom_macos_x86_64.zip
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Install application dependencies
+        run: python -m pip install -U pip && python -m pip install -e ".[dev]"
+        shell: bash
+
+      - name: Install sandbox runtime
+        working-directory: src/reverseloom/browser/sandbox_env
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Prepare bundled Python
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          python scripts/prepare_pybin.py build/pybin --version "${{ matrix.python_version }}" --arch ${{ matrix.pybin_arch }}
+          "REVERSELOOM_PYBIN_DIR=$((Resolve-Path build/pybin).Path)" >> $env:GITHUB_ENV
+
+      - name: Prepare bundled Python
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          python scripts/prepare_pybin.py build/pybin --arch "${{ matrix.pybin_arch }}"
+          echo "REVERSELOOM_PYBIN_DIR=$PWD/build/pybin" >> "$GITHUB_ENV"
+          echo "REVERSELOOM_MAC_ARCH=${{ matrix.mac_arch }}" >> "$GITHUB_ENV"
+
+      - name: Build Windows app
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          python -m PyInstaller --clean --noconfirm reverseloom.spec
+          dist/reverseloom/_internal/pybin/python.exe -c "import bs4, curl_cffi, parsel, Crypto, dateutil"
+          Compress-Archive -Path dist/reverseloom/* -DestinationPath "dist/${{ matrix.archive }}"
+
+      - name: Build macOS app
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          python -m PyInstaller --clean --noconfirm reverseloom-macos.spec
+          PYBIN="$(find dist/ReverseLoom.app -path '*/pybin/bin/python3' -print -quit)"
+          test -n "$PYBIN"
+          "$PYBIN" -c "import bs4, curl_cffi, parsel, Crypto, dateutil"
+          ditto -c -k --sequesterRsrc --keepParent dist/ReverseLoom.app "dist/${{ matrix.archive }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/* --generate-notes --title "$GITHUB_REF_NAME"
+          fi
