@@ -26,7 +26,7 @@ def cookie_user_id(session_id: str) -> str:
 # Root directory for per-session browser profiles, identities, and artifacts.
 SESSION_BASE_DIR: str = os.path.abspath(str(default_session_dir()))
 
-# Path to the Chromium-based browser executable (e.g. radar-browser). When set,
+# Path to the Chromium-based browser executable (e.g. kc-browser). When set,
 # patchright launches this instead of downloading its own Chromium.
 BROWSER_EXECUTABLE_PATH: str = os.environ.get("REVERSELOOM_BROWSER_PATH", "")
 

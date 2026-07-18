@@ -9,6 +9,8 @@ the latest snapshot is injected, keeping the agent grounded without exploding
 its memory.
 """
 import logging
+import os
+from pathlib import Path
 from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage
@@ -17,6 +19,7 @@ from langchain_core.runnables.config import RunnableConfig
 from reverseloom.browser.browser_manager import browser_manager
 from reverseloom.browser.browser_snapshot import capture_browser_snapshot
 from reverseloom.runtime import config as config_module
+from reverseloom.runtime.config import SESSION_BASE_DIR
 
 # Reverse-engineering tools that make the observer include debugger state.
 _DEBUGGER_TOOL_NAMES = {
@@ -58,6 +61,28 @@ async def _build_cdp_state_async(session) -> str:
     return f"Debugger state: PAUSED\n{report}"
 
 
+def _native_trace_status(session_id: str) -> str:
+    """Only evidence that kc-browser is active: JSONL under _native_trace."""
+    trace_dir = os.path.join(SESSION_BASE_DIR, session_id, "_native_trace")
+    files = sorted(Path(trace_dir).rglob("*.jsonl")) if os.path.isdir(trace_dir) else []
+    if not files:
+        return (
+            "Native binding trace: UNAVAILABLE\n"
+            f"  dir: {trace_dir}\n"
+            "  guidance: no *.jsonl yet (only kc-browser writes these). "
+            "Do not wait for a trace; use ordinary CDP/sandbox patching."
+        )
+    latest = "\n".join(f"    - {p}" for p in files[:5])
+    return (
+        "Native binding trace: AVAILABLE\n"
+        f"  dir: {trace_dir}\n"
+        f"  files: {len(files)}\n"
+        f"  latest:\n{latest}\n"
+        "  guidance: when sandbox env rebuild stalls, use these JSONL files "
+        "(see deep-reverse references/native-binding-trace.md)."
+    )
+
+
 def _build_browser_state_text(snapshot: Dict[str, Any]) -> str:
     parts = [
         f"Current URL: {snapshot.get('url', 'about:blank')}",
@@ -68,6 +93,10 @@ def _build_browser_state_text(snapshot: Dict[str, Any]) -> str:
         "Page elements:",
         str(snapshot.get("dom_content", "")),
     ]
+
+    native_trace = str(snapshot.get("native_trace_status") or "").strip()
+    if native_trace:
+        parts.append(native_trace)
 
     debugger_state = str(snapshot.get("cdp_state") or "").strip()
     if debugger_state:
@@ -119,6 +148,7 @@ def create_browser_observer_node(*, tools: List[Any]):
         session = await browser_manager.get_or_create_session(session_id, user_id)
 
         snapshot = await capture_browser_snapshot(session)
+        snapshot["native_trace_status"] = _native_trace_status(session_id)
         snapshot["cdp_state"] = (
             await _build_cdp_state_async(session)
             if include_debugger else "Debugger monitoring is disabled."

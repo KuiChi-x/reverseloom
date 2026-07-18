@@ -131,6 +131,7 @@ MODEL=gpt-4o
 - **断点**：`set_line_breakpoint` / `break_on_request` / `get_paused_state` / `evaluate_in_call_frame` / `step_execution`
 - **网络**：`search_in_network_payloads` / `inspect_network_request`（含 initiator 调用栈）
 - **脚本**：`search_in_js_codes` / `get_script_source` / `dump_runtime_asset` / `extract_webpack_loader`
+- **C++ Native binding trace**（仅 [kc-browser](https://github.com/KuiChi-x/kc-browser)）：自动落在 `<session>/_native_trace/**.jsonl` —— 指纹哈希明文输入 + 原生 API 叶子值；沙箱环境补齐卡住、CDP 不够用时直接当 oracle。普通 Chrome/Edge 会忽略该参数，不会产生文件
 </details>
 
 <details>
@@ -163,6 +164,7 @@ MODEL=gpt-4o
 
 - **浏览器层**：patchright 自动拉起系统 Chromium；每会话独立 profile、指纹启动参数（`--fp-seed` / `--fp-timezone` / `--fp-platform`）、可选代理隧道，每个页面独立 CDP handler，无损抓包 + JS 调试。
 - **沙箱层**：把 dump 出的签名/token/加密生成器丢进 Node + jsdom 离线跑——带反检测护甲 + 深度 Proxy 监控。喂它一个 payload，返回生成结果、缺失 API 清单、抓获的网络。
+- **C++ Native binding trace**（仅 [kc-browser](https://github.com/KuiChi-x/kc-browser)）：当 `REVERSELOOM_BROWSER_PATH` 指向 kc-browser 时，会话启动会带 `--fp-native-trace-dir=<session>/_native_trace`。引擎把原生 API 读/调用按 `line:column` 记成 JSONL——哈希明文输入（`TextEncoder.encode` / `digest` / `JSON.stringify` 的 args）和叶子返回值（`BatteryManager.level`、`NetworkInformation.rtt` 等）。沙箱环境重建卡住时，`deep-reverse` 技能会读这份 trace 当 oracle，而不是猜缺哪些 API。普通 Chrome/Edge 忽略该参数；`_native_trace` 目录为空就表示当前浏览器没有写出 trace。
 
 <a id="full-power"></a>
 

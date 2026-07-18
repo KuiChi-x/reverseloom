@@ -14,7 +14,7 @@ from reverseloom.browser.session_manager import SessionManager, BrowserSession
 class BrowserManager:
     """
     Browser factory. Launches browser processes (via patchright, pointed at a
-    Chromium-based executable such as radar-browser) with the right fingerprint
+    Chromium-based executable such as kc-browser) with the right fingerprint
     launch args and an optional local proxy tunnel. Does NOT store session
     state; delegates that to SessionManager. Requires an explicit session_id
     for all operations to keep sessions strictly isolated.

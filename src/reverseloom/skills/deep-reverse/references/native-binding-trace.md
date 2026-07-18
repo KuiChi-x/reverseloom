@@ -1,24 +1,32 @@
-# Native Binding Trace — sandbox environment oracle
+# Native Binding Trace - sandbox environment oracle
 
-When rebuilding the sandbox environment has stalled — the `todo` keeps naming new
-missing APIs, or `result` stays wrong and you cannot see why — read the trace of
-the real run. It is captured automatically (radar-browser only). If no trace files
-exist, the browser did not emit one; continue with ordinary patching.
+When sandbox environment rebuild has stalled, check the observer block
+**Native binding trace:** first. That status is computed only by scanning
+`<session>/_native_trace/**/*.jsonl` every turn. Do **not** guess from browser
+path, product string, UA, or docs.
+
+| Observer state | Meaning | What to do |
+|---|---|---|
+| AVAILABLE | At least one `*.jsonl` under `_native_trace` | Use those files as the oracle (below) |
+| UNAVAILABLE | No JSONL files | **Do not wait.** Continue ordinary CDP + sandbox patching only |
+
+Only **kc-browser** writes these files. Stock Chrome/Edge ignore
+`--fp-native-trace-dir` and leave the directory empty.
 
 ## The two signals
 
-Everything useful is one of these, both keyed to `line:column` in the deobfuscated
+Everything useful is one of these, both keyed to line:column in the deobfuscated
 script:
 
 1. **Hash inputs — the answer in plaintext.** Fingerprinters serialize each
    component and feed it to a hash/serialize call (`TextEncoder.encode`,
-   `SubtleCrypto.digest`, `JSON.stringify`, `btoa`, `Blob`). Its string `args` are
+   `SubtleCrypto.digest`, `JSON.stringify`, `btoa`, `Blob`). Its string args are
    the exact bytes hashed. Reproduce those bytes in the sandbox and the hash
    matches — you skip re-deriving every environment read. Read them in call order:
    that sequence *is* the component list.
 2. **Leaf values — what the sandbox must return.** Each native read shows its
    concrete scalar (`BatteryManager.level.get = 1`, `NetworkInformation.rtt = 100`).
-   Captured on radar-browser, so these already include its spoofing: **match the
+   Captured on kc-browser, so these already include its spoofing: **match the
    trace, never real hardware.** Any sandbox value that disagrees with its leaf is
    the bug.
 
@@ -28,8 +36,8 @@ Order and value are the signal; call frequency is not — one
 
 ## The record
 
-One JSON object per line. `api` is `Interface.method` or `Interface.attr.get`/
-`.set`. Primitives carry `value` (or `valueText` for `Infinity`/`NaN`); strings
+One JSON object per line. `api` is `Interface.method` or `Interface.attr.get` /
+`.set`. Primitives carry `value` (or `valueText` for Infinity/NaN); strings
 over 1024 B set `"truncated":true`; objects/arrays give only `{"type":"object"}`
 with no contents.
 
@@ -40,16 +48,16 @@ with no contents.
 
 ## Where it is
 
+The observer prints the absolute path(s). Conventionally:
+
 ```
 <session>/_native_trace/<domain>_<time>_pid-<pid>/<url-path>_<time>.jsonl
 ```
 
 `<session>` is the parent of `REVERSELOOM_ARTIFACT_DIR` (which `run_shell`
 injects). Expect many dirs — most are browser noise (`new-tab-page`, `gstatic`,
-`unknown`), the same domain splits across several dirs (one renderer, many V8
-contexts; worker code lands under `unknown`), one file per script. Do not pick a
-dir by hand: find the file(s) for the anti-bot script you already identified (by
-filename, e.g. `*creep.js*`), or glob all and filter lines to that script.
+`unknown`). Find the file(s) for the anti-bot script you already identified
+(by filename, e.g. `*creep.js*`), or glob all and filter lines to that script.
 
 ## Worked example
 
@@ -64,28 +72,22 @@ browser's. In the trace file you find, in order:
 [7533:41] NetworkInformation.rtt.get = 100
 ```
 
-Signal 1 (the `encode` args) is the component list feeding the hash: locale trio,
-screen `[w,h,depth]`, WebGL renderer, … Make the sandbox emit those same strings
-and the hash matches. The WebGL one is `truncated` — reconstruct its full value
-from signal 2 (the `getParameter`/renderer leaf reads at that call site). Set
-`battery.level=1`, `rtt=100`, etc. from signal 2 wherever the sandbox disagrees.
+Signal 1 (the encode args) is the component list feeding the hash. Make the
+sandbox emit those same strings and the hash matches. Use signal 2 leaf values
+for any component still wrong or truncated.
 
 ## How to extract
 
 Do not eyeball the firehose. With `run_shell`, two passes:
 
 - **Signal 1**: grep lines whose `api` contains `encode|digest|stringify|btoa|Blob`,
-  print their `args` strings in file order.
-- **Signal 2**: filter lines whose `result.type` is `number|string|boolean|null`,
-  print `line:column  api = value`, dedup by `line:column`+value.
-
-Use whatever one-off (grep/python/jq) fits the file; the schema above is all you
-need to parse it. Then reproduce signal 1's bytes; use signal 2 for any component
-still wrong or `truncated`.
+  print their args strings in file order.
+- **Signal 2**: filter lines whose `result.type` is number/string/boolean/null,
+  print `line:column  api = value`, dedup by line:column+value.
 
 ## Limits
 
-- Objects/arrays have no contents — get structure from signal 1's serialized
-  string or a Path A breakpoint.
-- Strings truncate at 1024 B — rebuild long payloads from their leaf reads.
+- Objects/arrays have no contents — get structure from signal 1 or a breakpoint.
+- Strings truncate at 1024 B — rebuild long payloads from leaf reads.
 - No dedup at source — always filter to your script and collapse repeats.
+- If the observer says UNAVAILABLE, this entire document is a no-op.

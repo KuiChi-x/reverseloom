@@ -131,6 +131,7 @@ MODEL=gpt-4o
 - **Breakpoints**: `set_line_breakpoint` / `break_on_request` / `get_paused_state` / `evaluate_in_call_frame` / `step_execution`
 - **Network**: `search_in_network_payloads` / `inspect_network_request` (with initiator stack)
 - **Scripts**: `search_in_js_codes` / `get_script_source` / `dump_runtime_asset` / `extract_webpack_loader`
+- **C++ Native binding trace** *([kc-browser](https://github.com/KuiChi-x/kc-browser) only)*: auto-written under `<session>/_native_trace/**.jsonl` — hash pre-images + native leaf values for sandbox environment rebuild when CDP alone is not enough. Stock Chrome/Edge ignore the flag and emit nothing.
 </details>
 
 <details>
@@ -163,6 +164,7 @@ MODEL=gpt-4o
 
 - **Browser**: patchright auto-launches your system Chromium; each session gets its own profile, fingerprint launch args (`--fp-seed` / `--fp-timezone` / `--fp-platform`), optional proxy tunnel, and a per-page CDP handler for lossless network capture + JS debugging.
 - **Sandbox**: run a dumped sign/token/encryption generator offline in Node + jsdom — anti-detection armor + deep-Proxy monitoring. Feed it a payload, get back the result, missing-API todo list, and captured network.
+- **C++ Native binding trace** *([kc-browser](https://github.com/KuiChi-x/kc-browser) only)*: when `REVERSELOOM_BROWSER_PATH` points at kc-browser, each session is launched with `--fp-native-trace-dir=<session>/_native_trace`. The engine records native API reads/calls as JSONL keyed by `line:column` — hash inputs in plaintext (`TextEncoder.encode` / `digest` / `JSON.stringify` args) plus exact leaf values (`BatteryManager.level`, `NetworkInformation.rtt`, …). When sandbox environment rebuild stalls, the `deep-reverse` skill reads that trace as an oracle instead of guessing missing APIs. Stock Chrome/Edge ignore the flag; an empty `_native_trace` dir means the browser did not emit one.
 
 <a id="full-power"></a>
 

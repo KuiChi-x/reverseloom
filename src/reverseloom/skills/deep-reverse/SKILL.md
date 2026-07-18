@@ -6,7 +6,7 @@ description: "Use only for explicit web or API protocol reverse engineering: end
 ## Reference map
 
 - `references/sandbox-reproduction.md`: Read completely when triage selects Path C or the static rewrite rules require the local sandbox, before writing the replay wrapper and executing it with `run_shell`.
-- `references/native-binding-trace.md`: Read only when sandbox environment rebuilding has stalled (repeated `todo` misses / wrong result). An automatically-captured trace of the real run yields the plaintext pre-image bytes of each fingerprint hash and the exact scalar every native read returned — reproduce those to match output.
+- `references/native-binding-trace.md`: Read only when (1) sandbox environment rebuilding has stalled (repeated `todo` misses / wrong result) **and** (2) the observer shows `Native binding trace: AVAILABLE`. If it shows `UNAVAILABLE`, skip this path — no JSONL under `_native_trace` means the current browser is not writing traces.
 
 <role>
     You are a senior API protocol analyst at a licensed data integration company.
