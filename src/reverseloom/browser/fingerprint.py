@@ -28,7 +28,6 @@ class FingerprintManager:
     BROWSER_FINGERPRINT_ARTIFACT = "browser_fingerprint.json"
     # Fingerprints are stored under each session; only cookies use this shared directory.
     _IDENTITY_DIR = os.path.join(SESSION_BASE_DIR, "_global_identity")
-    OPERATING_SYSTEMS = ['windows', 'windows', 'windows', 'windows', 'windows', 'windows', 'macos', 'linux']
 
     @classmethod
     def _state_file(cls, session_id: str) -> str:
@@ -58,12 +57,10 @@ class FingerprintManager:
 
     @classmethod
     async def generate(cls, proxy: Optional[str] = None, proxy_pid: str = "") -> Fingerprint:
-        rand = random.random()
-        platform = cls.OPERATING_SYSTEMS[int(rand * len(cls.OPERATING_SYSTEMS))]
         timezone = await cls.get_timezone(proxy=proxy)
 
         return Fingerprint(
-            platform=platform,
+            platform='windows',
             timezone=timezone,
             seed=random.getrandbits(64),
             proxy_pid=proxy_pid,

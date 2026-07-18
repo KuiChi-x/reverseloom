@@ -68,6 +68,12 @@ class CheckpointerManager:
             ) from exc
         os.makedirs(os.path.dirname(config.DB_SQLITE_PATH), exist_ok=True)
         self._conn = await aiosqlite.connect(config.DB_SQLITE_PATH)
+        # Desktop DB can accumulate freelist after prune; WAL + busy_timeout keep
+        # UI history loads from stalling while another write is in flight.
+        await self._conn.execute("PRAGMA journal_mode=WAL")
+        await self._conn.execute("PRAGMA synchronous=NORMAL")
+        await self._conn.execute("PRAGMA busy_timeout=5000")
+        await self._conn.execute("PRAGMA temp_store=MEMORY")
         saver = AsyncSqliteSaver(self._conn)
         await saver.setup()
         return saver

@@ -10,10 +10,11 @@ flips it" property, applied to the session tables too.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
-    Column, DateTime, MetaData, String, Table, func, insert, select, update, delete,
+    Column, DateTime, MetaData, String, Table, insert, select, update, delete,
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
@@ -25,9 +26,13 @@ sessions = Table(
     "sessions", _metadata,
     Column("id", String(64), primary_key=True),
     Column("title", String(256), nullable=False, default=""),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
 )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _async_dsn() -> str:
@@ -66,21 +71,41 @@ class SessionStore:
             self._engine = None
 
     async def create_session(self, session_id: str, title: str = "") -> None:
+        now = _utc_now()
         async with self._engine.begin() as conn:
-            await conn.execute(insert(sessions).values(id=session_id, title=title or "New session"))
+            await conn.execute(insert(sessions).values(
+                id=session_id,
+                title=title or "New session",
+                created_at=now,
+                updated_at=now,
+            ))
 
     async def rename_session(self, session_id: str, title: str) -> None:
         async with self._engine.begin() as conn:
-            await conn.execute(update(sessions).where(sessions.c.id == session_id).values(title=title))
+            await conn.execute(
+                update(sessions)
+                .where(sessions.c.id == session_id)
+                .values(title=title, updated_at=_utc_now())
+            )
 
     async def touch_session(self, session_id: str, title_if_empty: str = "") -> None:
         """Ensure a row exists (create-if-missing), bumping updated_at."""
+        now = _utc_now()
         async with self._engine.begin() as conn:
             row = (await conn.execute(select(sessions.c.id).where(sessions.c.id == session_id))).first()
             if row is None:
-                await conn.execute(insert(sessions).values(id=session_id, title=title_if_empty or "New session"))
+                await conn.execute(insert(sessions).values(
+                    id=session_id,
+                    title=title_if_empty or "New session",
+                    created_at=now,
+                    updated_at=now,
+                ))
             else:
-                await conn.execute(update(sessions).where(sessions.c.id == session_id).values(updated_at=func.now()))
+                await conn.execute(
+                    update(sessions)
+                    .where(sessions.c.id == session_id)
+                    .values(updated_at=now)
+                )
 
     async def delete_session(self, session_id: str) -> None:
         async with self._engine.begin() as conn:
@@ -94,10 +119,19 @@ class SessionStore:
         out: List[Dict[str, Any]] = []
         for r in rows:
             d = dict(r)
-            # datetime columns aren't JSON-serializable by the default encoder;
-            # emit ISO strings so the row can go straight into JSONResponse.
+            # Emit UTC ISO with Z. Legacy SQLite CURRENT_TIMESTAMP rows are naive UTC.
             for k in ("created_at", "updated_at"):
-                if d.get(k) is not None:
-                    d[k] = d[k].isoformat()
+                value = d.get(k)
+                if value is None:
+                    continue
+                if isinstance(value, datetime):
+                    if value.tzinfo is None:
+                        value = value.replace(tzinfo=timezone.utc)
+                    d[k] = value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+                else:
+                    text = str(value).replace(" ", "T")
+                    if not text.endswith("Z") and "+" not in text[10:]:
+                        text += "Z"
+                    d[k] = text
             out.append(d)
         return out

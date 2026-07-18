@@ -1,6 +1,8 @@
 import os
 from typing import Any, Dict, Optional
 
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+
 import litellm
 from langchain_litellm import ChatLiteLLM
 

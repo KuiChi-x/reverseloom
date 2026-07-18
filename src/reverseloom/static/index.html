@@ -421,7 +421,7 @@
       </main>
     </div>
     <div class="settings-footer">
-      <div class="settings-status" id="setStatus">配置保存到 .env；浏览器、上下文和存储类参数需重启后生效。</div>
+      <div class="settings-status" id="setStatus">配置保存到 .env。修改后请重启生效。</div>
       <button class="save" id="setSave">保存配置</button>
     </div>
   </div>
@@ -954,8 +954,8 @@ async function loadSessions(openLatest = false) {
     }
     el.innerHTML='';
     rows.forEach(s => { const d = document.createElement('div'); d.className='sess'+(s.id===sessionId?' active':'');
-      const when = (s.updated_at||'').replace('T',' ').slice(5,16);
-      d.innerHTML = `<div class="st">${esc(s.title||'未命名')}</div><div class="sm"><span>${when}</span><span class="del">✕</span></div>`;
+      const when = formatEventTime(s.updated_at || s.created_at).replace(/^今天\s*/, '').replace(/^昨天\s*/, '昨天 ');
+      d.innerHTML = `<div class="st">${esc(s.title||'未命名')}</div><div class="sm"><span>${esc(when)}</span><span class="del">✕</span></div>`;
       d.onclick = (e) => { if (e.target.classList.contains('del')) { delSession(s.id); e.stopPropagation(); return; } openSession(s.id, s.title); };
       el.appendChild(d); });
   } catch (_) {}
@@ -1073,8 +1073,10 @@ async function openSession(id, title) {
   sessionId = id; ignoredLiveSessions.delete(id); resetActiveRenderState();
   stream.innerHTML=''; $('topTitle').textContent = title || id;
   try {
-    const payload = await fetch(`/api/sessions/${id}/history`).then(response => response.json());
+    const response = await fetch(`/api/sessions/${id}/history`);
+    const payload = await response.json();
     if (loadVersion !== sessionLoadVersion || sessionId !== id) return;
+    if (!response.ok) throw new Error(payload.error || `历史加载失败 (${response.status})`);
     // Checkpoint only keeps the latest delivery manifest; attach those cards to
     // the last assistant reply so history does not invent per-turn attribution.
     artifactRows = Array.isArray(payload.delivered_artifacts) ? payload.delivered_artifacts : [];
@@ -1094,6 +1096,11 @@ async function openSession(id, title) {
             type: 'step', id: step.step_id, created_at: step.created_at || step.timestamp, step,
           })),
         ].sort((left, right) => (historyTime(left.created_at) || 0) - (historyTime(right.created_at) || 0));
+    if (!timeline.length) {
+      const empty=document.createElement('div'); empty.className='turn';
+      empty.innerHTML='<div class="agent-text" style="color:var(--ink-3);padding:18px 8px">此会话没有可恢复的历史（checkpoint 缺失或尚未写入）。可继续在本会话发送新消息，或删除后新建。</div>';
+      stream.appendChild(empty);
+    }
     let lastAgentBody = null;
     let turnStartedAt = Number.NaN;
     timeline.forEach(event => {
@@ -1111,7 +1118,12 @@ async function openSession(id, title) {
         }
       }
     });
-  } catch (_) {}
+  } catch (error) {
+    if (loadVersion !== sessionLoadVersion || sessionId !== id) return;
+    const empty=document.createElement('div'); empty.className='turn';
+    empty.innerHTML=`<div class="agent-text" style="color:var(--err);padding:18px 8px">历史加载失败：${esc(String(error.message || error))}</div>`;
+    stream.appendChild(empty);
+  }
   loadSessions(); down(true);
 }
 async function delSession(id) {
@@ -1290,12 +1302,12 @@ async function saveSettings() {
       configRequired = false; clearConfigNotice();
       if (!running && sock) sock.close(); else if (!sock) connect();
     }
-    if (result.restart_required) {
-      status.className = 'settings-status warn'; status.textContent = `\u5df2\u4fdd\u5b58 ${result.changed.length} \u9879\u914d\u7f6e\u3002\u8bf7\u91cd\u542f\u540e\u7aef\u4ee5\u5e94\u7528\u6d4f\u89c8\u5668\u3001\u4e0a\u4e0b\u6587\u6216\u5b58\u50a8\u53c2\u6570\u3002`;
-    } else if (result.reconnect_required) {
-      status.className = 'settings-status success'; status.textContent = running ? '\u5df2\u4fdd\u5b58\uff0c\u5f53\u524d\u4efb\u52a1\u5b8c\u6210\u540e\u91cd\u65b0\u8fde\u63a5\u6a21\u578b\u3002' : '\u5df2\u4fdd\u5b58\uff0c\u6a21\u578b\u8fde\u63a5\u6b63\u5728\u5237\u65b0\u3002';
+    if ((result.changed || []).length) {
+      status.className = 'settings-status warn';
+      status.textContent = '\u5df2\u4fdd\u5b58\uff0c\u8bf7\u91cd\u542f\u540e\u751f\u6548\u3002';
     } else {
-      status.className = 'settings-status success'; status.textContent = '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002';
+      status.className = 'settings-status success';
+      status.textContent = '\u914d\u7f6e\u5df2\u4fdd\u5b58\u3002';
     }
   } catch (error) {
     status.className = 'settings-status error'; status.textContent = String(error.message || error);

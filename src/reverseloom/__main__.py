@@ -149,6 +149,9 @@ def main() -> None:
     args = parser.parse_args()
 
     load_dotenv(settings_env_path())  # BASE_URL / OPENAI_API_KEY / MODEL / REVERSELOOM_*
+    # Skip LiteLLM's remote model-cost map fetch on import.
+    import os
+    os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
     url = f"http://{args.host}:{args.port}"
 
     if args.web:
