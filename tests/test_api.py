@@ -961,6 +961,8 @@ def test_index_supports_image_and_pdf_attachments():
     assert "async function uploadFiles" in html
     assert "pendingAttachments" in html
     assert "attachments, session_id" in html
+    assert "collectClipboardFiles" in html
+    assert "composerBox').addEventListener('paste'" in html or 'composerBox").addEventListener("paste"' in html or "$('composerBox').addEventListener('paste'" in html
 
 
 def test_pdf_attachment_is_sent_as_native_file_content():

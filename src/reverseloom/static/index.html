@@ -857,23 +857,57 @@ function renderPendingAttachments() {
     attachmentTray.appendChild(chip);
   });
 }
+function attachmentFileName(file, index = 0) {
+  const raw = String(file?.name || '').trim();
+  if (raw && raw !== 'image.png' && raw !== 'blob') return raw;
+  const mime = String(file?.type || '').toLowerCase();
+  const ext = mime === 'image/jpeg' ? 'jpg'
+    : mime === 'image/gif' ? 'gif'
+    : mime === 'image/webp' ? 'webp'
+    : mime === 'application/pdf' ? 'pdf'
+    : 'png';
+  return `paste-${Date.now()}-${index + 1}.${ext}`;
+}
 async function uploadFiles(files) {
   if (!files?.length || running) return;
   if (!sessionId) sessionId=createSessionId();
   attachBtn.disabled=true; setConn('busy','正在上传附件');
   try {
-    for (const file of files) {
-      const response=await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/attachments?filename=${encodeURIComponent(file.name)}`, {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const filename = attachmentFileName(file, i);
+      const response=await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/attachments?filename=${encodeURIComponent(filename)}`, {
         method:'POST', headers:{'Content-Type':file.type || 'application/octet-stream'}, body:file,
       });
       const result=await response.json();
-      if (!response.ok) throw new Error(result.error || `附件上传失败：${file.name}`);
+      if (!response.ok) throw new Error(result.error || `附件上传失败：${filename}`);
       pendingAttachments.push(result);
     }
     renderPendingAttachments(); setConn('on','已连接');
   } catch (error) {
     setConn('','附件上传失败'); alert(String(error.message || error));
   } finally { attachBtn.disabled=false; attachInput.value=''; }
+}
+function collectClipboardFiles(event) {
+  const items = Array.from(event.clipboardData?.items || []);
+  const files = [];
+  items.forEach((item, index) => {
+    if (item.kind !== 'file') return;
+    const type = String(item.type || '').toLowerCase();
+    if (!(type.startsWith('image/') || type === 'application/pdf')) return;
+    const blob = item.getAsFile();
+    if (!blob) return;
+    // Clipboard images often arrive as nameless blobs; give them a stable name.
+    files.push(new File([blob], attachmentFileName(blob, index), { type: blob.type || type }));
+  });
+  // Some browsers also put files on clipboardData.files.
+  Array.from(event.clipboardData?.files || []).forEach((file, index) => {
+    const type = String(file.type || '').toLowerCase();
+    if (!(type.startsWith('image/') || type === 'application/pdf')) return;
+    if (files.some(existing => existing.size === file.size && existing.type === file.type && existing.name === file.name)) return;
+    files.push(new File([file], attachmentFileName(file, files.length + index), { type: file.type || type }));
+  });
+  return files;
 }
 function attachmentBubbleHtml(attachments) {
   if (!attachments.length) return '';
@@ -1278,6 +1312,13 @@ attachBtn.onclick=()=>{ if (!running) attachInput.click(); };
 attachInput.onchange=()=>void uploadFiles(Array.from(attachInput.files || []));
 taskEl.addEventListener('input', autosize);
 taskEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); run(); } });
+// Ctrl/Cmd+V images (and PDF files) into the composer → same attachment path as the ＋ button.
+$('composerBox').addEventListener('paste', (e) => {
+  const files = collectClipboardFiles(e);
+  if (!files.length || running) return;
+  e.preventDefault();
+  void uploadFiles(files);
+});
 sendBtn.onclick = () => { if (running && sock) sock.send(JSON.stringify({stop:true, session_id:sessionId})); else run(); };
 $('btnNew').onclick = newSession;
 $('btnGear').onclick = openSettings;

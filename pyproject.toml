@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "graphloom>=0.1",
+    "graphloom>=0.1.6",
     "langchain-litellm>=0.7,<0.8",
     "litellm>=1.83.14,<1.92",
     "fastapi>=0.110",
