@@ -386,6 +386,9 @@ def test_build_llm_builds_litellm_model_from_selected_protocol(monkeypatch):
     monkeypatch.setenv("BASE_URL", "https://example.invalid")
     monkeypatch.setenv("OPENAI_API_KEY", "provider-key")
     monkeypatch.setenv("MODEL", "claude-sonnet-test")
+    monkeypatch.delenv("MODEL_REASONING_EFFORT", raising=False)
+    monkeypatch.delenv("PROMPT_CACHE_KEY", raising=False)
+    monkeypatch.delenv("PROMPT_CACHE_RETENTION", raising=False)
     monkeypatch.setattr(build_module, "ChatLiteLLM", FakeChatModel)
 
     build_module.build_llm()
@@ -395,6 +398,11 @@ def test_build_llm_builds_litellm_model_from_selected_protocol(monkeypatch):
         "api_base": "https://example.invalid",
         "api_key": "provider-key",
         "streaming": True,
+        "model_kwargs": {
+            "cache_control_injection_points": [
+                {"location": "message", "index": 1},
+            ],
+        },
     }
 
 

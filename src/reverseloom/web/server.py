@@ -525,7 +525,6 @@ def create_app() -> FastAPI:
             else:
                 invoke_input = {
                     "input_query": display_text,
-                    "session_id": run_session_id,
                     "attach_message_parts": attachment_parts or None,
                     "input_artifact_manifest": input_manifest,
                 }
@@ -559,7 +558,6 @@ def create_app() -> FastAPI:
                     "event_emitter": _emit,
                     "runtime_context": {
                         "artifact_dir": artifact_directory,
-                        "session_id": run_session_id,
                         "user_id": config.cookie_user_id(run_session_id),
                     },
                 },

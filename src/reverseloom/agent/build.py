@@ -49,13 +49,18 @@ def build_llm() -> ChatLiteLLM:
         "api_key": os.environ.get("OPENAI_API_KEY") or None,
         "streaming": True,
     }
-    model_kwargs: Dict[str, Any] = {
-        "prompt_cache_key": (os.environ.get("PROMPT_CACHE_KEY", "").strip() or f"reverseloom:{model}"),
-        "prompt_cache_retention": os.environ.get("PROMPT_CACHE_RETENTION", "24h").strip(),
-        "cache_control_injection_points": [
-            {"location": "message", "role": "system"},
-        ]
+    model_kwargs: Dict[str, Any] = {}
+    model_kwargs["extra_body"] = {
+        "prompt_cache_key": (
+            os.environ.get("PROMPT_CACHE_KEY", "").strip() or f"reverseloom:{model}"
+        ),
     }
+    retention = os.environ.get("PROMPT_CACHE_RETENTION", "24h").strip()
+    model_kwargs["extra_body"]["prompt_cache_retention"] = retention
+    model_kwargs["cache_control_injection_points"] = [
+        {"location": "message", "index": 1},
+    ]
+
     reasoning_effort = os.environ.get("MODEL_REASONING_EFFORT", "").strip().lower()
     budget = _EFFORT_THINKING_BUDGETS.get(reasoning_effort)
     if budget is not None:
@@ -64,7 +69,6 @@ def build_llm() -> ChatLiteLLM:
             "type": "enabled",
             "budget_tokens": budget,
         }
-    model_kwargs.update()
     if model_kwargs:
         kwargs["model_kwargs"] = model_kwargs
     return ChatLiteLLM(**kwargs)
