@@ -38,22 +38,7 @@ dependencies = [
     "tldextract>=5.1",
     "langgraph-checkpoint-sqlite>=2.0",
     "SQLAlchemy>=2.0",
-]
-
-[project.scripts]
-reverseloom = "reverseloom.__main__:main"
-
-[project.optional-dependencies]
-postgres = ["langgraph-checkpoint-postgres>=2.0", "psycopg[binary,pool]>=3.1"]
-dev = ["pytest>=7", "pytest-asyncio>=0.21", "ruff>=0.6", "pyinstaller"]
-# Libraries the agent-generated crawlers commonly import. Pre-installed so
-# crawlers run with zero user setup: `pip install .[crawler]` in source mode,
-# and staged into the bundled runtime by scripts/prepare_pybin.py for the
-# frozen build. curl_cffi / openpyxl / tldextract are core deps (already above);
-# they're intentionally omitted here to avoid version drift. NOTE: the PyPI
-# `datetime` package is deliberately NOT included — it shadows the stdlib
-# datetime module; use stdlib datetime + python-dateutil instead.
-crawler = [
+    # Agent-generated crawlers are a core product capability, not an optional extra.
     "beautifulsoup4>=4.12",
     "parsel>=1.9",
     "loguru>=0.7",
@@ -66,6 +51,13 @@ crawler = [
     "xlrd>=2.0",
     "x-client-transaction-id>=0.0.1",
 ]
+
+[project.scripts]
+reverseloom = "reverseloom.__main__:main"
+
+[project.optional-dependencies]
+postgres = ["langgraph-checkpoint-postgres>=2.0", "psycopg[binary,pool]>=3.1"]
+dev = ["pytest>=7", "pytest-asyncio>=0.21", "ruff>=0.6", "pyinstaller", "tomli>=2.0; python_version < '3.11'"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,4 +1,7 @@
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 import time
 from pathlib import Path
 
@@ -27,6 +30,16 @@ def test_public_suffix_dependency_is_declared():
 
     dependencies = project["project"]["dependencies"]
     assert any(item.startswith("tldextract") for item in dependencies)
+
+
+def test_crawler_dependencies_are_core_runtime_dependencies():
+    project_file = Path(__file__).parents[1] / "pyproject.toml"
+    project = tomllib.loads(project_file.read_text(encoding="utf-8"))
+
+    dependencies = project["project"]["dependencies"]
+    assert any(item.startswith("beautifulsoup4") for item in dependencies)
+    assert any(item.startswith("parsel") for item in dependencies)
+    assert "crawler" not in project["project"].get("optional-dependencies", {})
 
 
 def test_desktop_packager_is_declared_as_dev_dependency():
@@ -142,6 +155,15 @@ def test_desktop_bundle_collects_patchright_driver_without_env_file():
     assert 'collect_data_files("patchright")' in spec
     assert '(".env"' not in spec
     assert '(".env.example"' not in spec
+
+
+def test_windows_bundle_requires_crawler_python_runtime():
+    spec_file = Path(__file__).parents[1] / "reverseloom.spec"
+    spec = spec_file.read_text(encoding="utf-8")
+
+    assert "REVERSELOOM_PYBIN_DIR is required" in spec
+    assert "prepare the bundled crawler runtime" in spec
+    assert "import bs4, curl_cffi, parsel, Crypto, dateutil" in spec
 
 
 def test_desktop_bundle_collects_model_backends():

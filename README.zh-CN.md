@@ -87,7 +87,7 @@ python -m reverseloom          # 原生桌面窗口
 python -m reverseloom --web    # 或仅起服务，用浏览器打开
 ```
 
-本地开发（测试、lint、agent 生成的爬虫运行时）用 `pip install -e ".[dev,crawler]"`，详见 [docs/development.md](docs/development.md)。
+本地开发（测试、lint、agent 生成的爬虫运行时）用 `pip install -e ".[dev]"`；爬虫依赖已经属于核心运行时。详见 [docs/development.md](docs/development.md)。
 
 Node 沙箱已内置预构建（`reverseloom-sandbox.bundle.js`），开箱即用。
 

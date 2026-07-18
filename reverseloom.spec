@@ -12,6 +12,7 @@
 # local .env through the configuration center after launch. Never ship a configured .env. No browser is bundled or downloaded;
 # the app discovers an installed Chrome/Chromium browser or uses REVERSELOOM_BROWSER_PATH.
 import os
+import subprocess
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 block_cipher = None
@@ -38,26 +39,38 @@ if not os.path.isfile(sandbox_jsdom_manifest):
 # the whole dependency tree is resolved by pip, not hand-copied). The spec just
 # packages the prepared directory verbatim. Point REVERSELOOM_PYBIN_DIR at it.
 _pybin_src = os.environ.get("REVERSELOOM_PYBIN_DIR", "").strip()
-pybin_datas = []
-if _pybin_src:
-    _pybin_exe = os.path.join(_pybin_src, "python.exe")
-    if not os.path.isfile(_pybin_exe):
-        raise SystemExit(
-            f"REVERSELOOM_PYBIN_DIR={_pybin_src!r} has no python.exe; "
-            "run `python scripts/prepare_pybin.py <dir>` first."
-        )
-    for _root, _dirs, _files in os.walk(_pybin_src):
-        for _f in _files:
-            _abs = os.path.join(_root, _f)
-            _rel = os.path.relpath(_root, _pybin_src)
-            pybin_datas.append((_abs, os.path.join("pybin", _rel)))
-else:
-    print(
-        "[reverseloom.spec] WARNING: REVERSELOOM_PYBIN_DIR not set; the build "
-        "will NOT ship a Python runtime and agent crawlers will fall back to "
-        "the user's system Python. Run scripts/prepare_pybin.py to enable "
-        "zero-setup crawlers."
+if not _pybin_src:
+    raise SystemExit(
+        "REVERSELOOM_PYBIN_DIR is required: prepare the bundled crawler runtime "
+        "with scripts/prepare_pybin.py before building the production package."
     )
+_pybin_exe = os.path.join(_pybin_src, "python.exe")
+if not os.path.isfile(_pybin_exe):
+    raise SystemExit(
+        f"REVERSELOOM_PYBIN_DIR={_pybin_src!r} has no python.exe; "
+        "run `python scripts/prepare_pybin.py <dir>` first."
+    )
+_crawler_probe = subprocess.run(
+    [
+        _pybin_exe,
+        "-c",
+        "import bs4, curl_cffi, parsel, Crypto, dateutil",
+    ],
+    capture_output=True,
+    text=True,
+)
+if _crawler_probe.returncode != 0:
+    raise SystemExit(
+        "The bundled crawler runtime is missing a required dependency; "
+        "run scripts/prepare_pybin.py again.\n"
+        f"{_crawler_probe.stderr.strip()}"
+    )
+pybin_datas = []
+for _root, _dirs, _files in os.walk(_pybin_src):
+    for _f in _files:
+        _abs = os.path.join(_root, _f)
+        _rel = os.path.relpath(_root, _pybin_src)
+        pybin_datas.append((_abs, os.path.join("pybin", _rel)))
 
 datas = [
     # the static web UI must ship inside the binary

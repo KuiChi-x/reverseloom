@@ -87,7 +87,7 @@ python -m reverseloom          # native desktop window
 python -m reverseloom --web    # or serve, open in your browser
 ```
 
-For local development (tests, lint, agent-generated crawlers), use `pip install -e ".[dev,crawler]"` — see [docs/development.md](docs/development.md).
+For local development (tests, lint, agent-generated crawlers), use `pip install -e ".[dev]"` — crawler dependencies are part of the core runtime. See [docs/development.md](docs/development.md).
 
 The Node sandbox ships prebuilt (`reverseloom-sandbox.bundle.js`) — works out of the box.
 

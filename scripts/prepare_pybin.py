@@ -37,8 +37,8 @@ import zipfile
 from pathlib import Path
 
 # Libraries the agent-generated crawlers import, staged into the bundled runtime
-# so crawlers run with zero user setup. Keep this in sync with the [crawler]
-# optional-dependencies group in pyproject.toml. pip resolves each package's
+# so crawlers run with zero user setup. Keep this in sync with the core
+# dependencies in pyproject.toml. pip resolves each package's
 # full transitive tree (curl_cffi -> cffi/certifi/..., parsel -> lxml/w3lib/cssselect,
 # etc.), so nothing is silently missed. The PyPI `datetime` package is
 # intentionally excluded (it shadows the stdlib datetime module).
@@ -113,7 +113,12 @@ def _install_deps(dest: Path) -> None:
 def _verify(dest: Path) -> None:
     exe = dest / "python.exe"
     out = subprocess.run(
-        [str(exe), "-c", "import curl_cffi; print('curl_cffi', curl_cffi.__version__)"],
+        [
+            str(exe),
+            "-c",
+            "import bs4, curl_cffi, parsel, Crypto, dateutil; "
+            "print('crawler runtime verified')",
+        ],
         check=True, capture_output=True, text=True,
     )
     print(f"[prepare_pybin] verify: {out.stdout.strip()}")
