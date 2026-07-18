@@ -18,21 +18,19 @@ async def test_sqlite_checkpointer_roundtrip():
         await mgr.close()
 
 
-async def test_memory_backend_uses_in_process_checkpointer():
-    mgr = CheckpointerManager(backend="memory")
-    cp = await mgr.open()
-    assert type(cp).__name__ == "InMemorySaver"
-    await mgr.close()
-
-
 async def test_unknown_backend_raises():
     mgr = CheckpointerManager(backend="mysql")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="sqlite | postgres"):
+        await mgr.open()
+
+
+async def test_memory_backend_is_rejected():
+    mgr = CheckpointerManager(backend="memory")
+    with pytest.raises(ValueError, match="sqlite | postgres"):
         await mgr.open()
 
 
 async def test_postgres_backend_requires_url(monkeypatch):
-    # No DB_URL configured -> clear, early failure (not a silent wrong default).
     from reverseloom.runtime import config
     monkeypatch.setattr(config, "DB_URL", "")
     mgr = CheckpointerManager(backend="postgres")

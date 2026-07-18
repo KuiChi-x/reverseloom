@@ -48,7 +48,7 @@ def _async_dsn() -> str:
         elif dsn.startswith("postgres://"):
             dsn = "postgresql+psycopg://" + dsn[len("postgres://"):]
         return dsn
-    # SQLite also stores session metadata when the graph uses an in-memory checkpointer.
+    # SQLite also stores session metadata alongside the graph checkpointer.
     os.makedirs(os.path.dirname(config.DB_SQLITE_PATH), exist_ok=True)
     return f"sqlite+aiosqlite:///{config.DB_SQLITE_PATH}"
 

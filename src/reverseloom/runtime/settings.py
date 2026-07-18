@@ -110,7 +110,7 @@ SETTINGS_GROUPS = [
         "eyebrow": "STORAGE / PROCESS",
         "description": "配置会话目录、数据库后端和日志级别。",
         "fields": [
-            _field("REVERSELOOM_DB_BACKEND", "数据库后端", "SQLite 适合本地使用；PostgreSQL 适合多实例部署；Memory 不保留历史。", field_type="select", default="sqlite", options=[{"value": "sqlite", "label": "SQLite (推荐)"}, {"value": "postgres", "label": "PostgreSQL"}, {"value": "memory", "label": "Memory (不持久化)"}]),
+            _field("REVERSELOOM_DB_BACKEND", "数据库后端", "SQLite 适合本地使用；PostgreSQL 适合多实例部署。", field_type="select", default="sqlite", options=[{"value": "sqlite", "label": "SQLite (推荐)"}, {"value": "postgres", "label": "PostgreSQL"}]),
             _field("REVERSELOOM_DB_PATH", "SQLite 文件", "留空时使用 ~/.reverseloom/reverseloom.sqlite3。", placeholder=SQLITE_PATH_PLACEHOLDER),
             _field("REVERSELOOM_DB_URL", "PostgreSQL URL", "仅在数据库后端为 PostgreSQL 时使用。", field_type="password", secret=True, placeholder="postgresql://user:pass@host/db"),
             _field("REVERSELOOM_LOG_LEVEL", "日志级别", "控制服务端日志详细程度。", field_type="select", default="INFO", options=[{"value": "DEBUG", "label": "DEBUG"}, {"value": "INFO", "label": "INFO"}, {"value": "WARNING", "label": "WARNING"}, {"value": "ERROR", "label": "ERROR"}]),

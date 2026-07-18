@@ -181,8 +181,8 @@ def create_app() -> FastAPI:
         try:
             checkpointer = await app.state.ckpt.open()
         except Exception as exc:
-            # Persistence must not take the whole server down; fall back to
-            # memory (no resume) and surface the reason in logs.
+            # Persistence must not take the whole server down; surface the reason
+            # and continue without a checkpointer (no resume for this process).
             print(f"[reverseloom] checkpointer disabled: {type(exc).__name__}: {exc}")
             checkpointer = None
         app.state.checkpointer = checkpointer

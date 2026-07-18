@@ -7,11 +7,6 @@ Provides a LangGraph checkpointer chosen at runtime by ``config.DB_BACKEND``:
     postgres           — requires the ``postgres`` extra
                          (``pip install "reverseloom[postgres]"``) and
                          ``REVERSELOOM_DB_URL``. One env var flips the whole app over.
-    memory             — no checkpointer (state lost on restart).
-
-Unlike the earlier service implementation (which required postgres and raised NotImplementedError
-otherwise), the backend here is a real switch: the same code path builds either
-saver, so a local SQLite run and a PostgreSQL deployment differ only by env vars.
 
 The saver is a long-lived resource held for the whole application lifetime, so we
 manage the underlying connection explicitly (open on startup, close on shutdown)
@@ -42,11 +37,6 @@ class CheckpointerManager:
         self.checkpointer: Any = None
 
     async def open(self) -> Any:
-        if self.backend == "memory":
-            from langgraph.checkpoint.memory import InMemorySaver
-
-            self.checkpointer = InMemorySaver()
-            return self.checkpointer
         if self.backend == "sqlite":
             self.checkpointer = await self._open_sqlite()
             return self.checkpointer
@@ -54,7 +44,7 @@ class CheckpointerManager:
             self.checkpointer = await self._open_postgres()
             return self.checkpointer
         raise ValueError(
-            f"Unknown REVERSELOOM_DB_BACKEND={self.backend!r}; expected sqlite | postgres | memory"
+            f"Unknown REVERSELOOM_DB_BACKEND={self.backend!r}; expected sqlite | postgres"
         )
 
     async def _open_sqlite(self) -> Any:
@@ -68,12 +58,17 @@ class CheckpointerManager:
             ) from exc
         os.makedirs(os.path.dirname(config.DB_SQLITE_PATH), exist_ok=True)
         self._conn = await aiosqlite.connect(config.DB_SQLITE_PATH)
-        # Desktop DB can accumulate freelist after prune; WAL + busy_timeout keep
-        # UI history loads from stalling while another write is in flight.
+        # Desktop-oriented SQLite tuning: WAL for concurrent read/write,
+        # NORMAL fsync for much lower checkpoint latency than FULL, and a
+        # larger cache/mmap so history loads stay in memory after first open.
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute("PRAGMA synchronous=NORMAL")
-        await self._conn.execute("PRAGMA busy_timeout=5000")
         await self._conn.execute("PRAGMA temp_store=MEMORY")
+        await self._conn.execute("PRAGMA busy_timeout=5000")
+        await self._conn.execute("PRAGMA foreign_keys=ON")
+        await self._conn.execute("PRAGMA cache_size=-65536")
+        await self._conn.execute("PRAGMA mmap_size=268435456")
+        await self._conn.execute("PRAGMA wal_autocheckpoint=1000")
         saver = AsyncSqliteSaver(self._conn)
         await saver.setup()
         return saver

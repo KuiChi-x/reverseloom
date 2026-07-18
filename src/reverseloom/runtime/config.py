@@ -53,7 +53,6 @@ UPSTREAM_PROXY_URL: str = build_proxy_url_from_env()
 # Backend for the LangGraph checkpointer (conversation state + resume).
 #   "sqlite"   (default) — local file, zero-config, good for the desktop build.
 #   "postgres"           — set REVERSELOOM_DB_URL to a postgresql:// DSN.
-#   "memory"             — no persistence (previous behaviour; state lost on restart).
 DB_BACKEND: str = os.environ.get("REVERSELOOM_DB_BACKEND", "sqlite").strip().lower()
 
 # SQLite checkpoint file (only used when DB_BACKEND == "sqlite").
