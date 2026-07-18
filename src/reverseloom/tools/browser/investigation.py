@@ -2050,78 +2050,6 @@ async def step_execution(action: str = "resume", **kwargs) -> str:
 
 # --- JS Extraction Tools ---
 
-class ExtractWebpackInput(StandardThoughtInput):
-    """Input for Webpack loader extraction."""
-    script_id: str = Field(description="Script ID containing the Webpack module")
-    module_ids: List[str] = Field(
-        default=[],
-        description="Specific Webpack module IDs to include. If empty, extracts the entire loader.",
-    )
-
-
-@tool("extract_webpack_loader", args_schema=ExtractWebpackInput)
-async def extract_webpack_loader(script_id: str, module_ids: List[str] = [], **kwargs) -> str:
-    """
-    Extract the Webpack global loader and specified modules from a bundled JS file.
-    Instead of extracting individual functions, this grabs the self-executing loader
-    (webpackChunk / JSONP push) so all internal dependencies resolve correctly.
-    The result is saved as a standalone JS file in the session directory.
-    """
-    import os
-    session_id = kwargs.get("session_id")
-    session = browser_manager.get_session(session_id)
-    cdp = await browser_manager.get_cdp_client(session_id)
-
-    meta = getattr(session, "script_registry", {}).get(script_id, {}) or {}
-    source = await _resolve_script_source(session, cdp, script_id, str(meta.get("url") or ""))
-    if not source:
-        return f"Cannot resolve source for script {script_id}."
-
-    # Detect Webpack patterns
-    webpack_patterns = [
-        # webpackJsonp / webpackChunk push pattern
-        r'((?:window\[?"webpackChunk\w*"?\]|self\[?"webpackChunk\w*"?\]|var \w+\s*=\s*\w+\s*\|\|\s*\[\])[\s\S]{0,500}\.push\s*\(\s*\[)',
-        # Classic self-executing IIFE with modules array/object
-        r'(\(function\s*\(\w+\)\s*\{[\s\S]{0,200}function\s+\w+\s*\(\s*\w+\s*\)[\s\S]{0,500}modules)',
-        # Modern arrow-function loader
-        r'((?:var|let|const)\s+\w+\s*=\s*\{[\s\S]{0,300}function\s*\(\s*\w+\s*,\s*\w+\s*,\s*\w+\s*\))',
-    ]
-
-    loader_start = -1
-    for pattern in webpack_patterns:
-        import re as _re
-        match = _re.search(pattern, source)
-        if match:
-            loader_start = match.start()
-            break
-
-    if loader_start < 0:
-        # Fallback: extract entire script (may be large)
-        extracted = source
-        note = "No Webpack loader pattern detected; extracted full script source."
-    else:
-        # Extract from loader start to end of script
-        extracted = source[loader_start:]
-        note = f"Webpack loader found at offset {loader_start}."
-
-    # Truncate if enormous
-    max_size = 500_000
-    if len(extracted) > max_size:
-        extracted = extracted[:max_size]
-        note += f" Truncated to {max_size} chars."
-
-    # Save to session dir
-    from reverseloom.runtime.config import artifact_dir as _artifact_dir
-    artifact_dir = _artifact_dir(session_id)
-    os.makedirs(artifact_dir, exist_ok=True)
-    filename = f"webpack_loader_{script_id}.js"
-    filepath = os.path.join(artifact_dir, filename)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(extracted)
-
-    return f"{note}\nSaved to: {filepath} ({len(extracted)} chars)"
-
-
 class DumpRuntimeAssetInput(StandardThoughtInput):
     """Input for dumping a full captured runtime asset to a standalone file."""
     request_id: str = Field(
@@ -2343,5 +2271,4 @@ REVERSE_TOOLS = [
     get_script_source,
     search_in_js_codes,
     dump_runtime_asset,
-    extract_webpack_loader,
 ]

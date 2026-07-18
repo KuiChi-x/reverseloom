@@ -144,6 +144,7 @@ class FingerprintManager:
         ]
         if trace_dir:
             args.append(f"--fp-native-trace-dir={trace_dir}")
+            args.append("--no-sandbox")
         return args
 
     @classmethod

@@ -32,7 +32,6 @@ _DEBUGGER_TOOL_NAMES = {
     "step_execution",
     "get_script_source",
     "search_in_js_codes",
-    "extract_webpack_loader",
     "dump_runtime_asset",
 }
 

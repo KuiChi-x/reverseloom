@@ -130,7 +130,7 @@ MODEL=gpt-4o
 
 - **Breakpoints**: `set_line_breakpoint` / `break_on_request` / `get_paused_state` / `evaluate_in_call_frame` / `step_execution`
 - **Network**: `search_in_network_payloads` / `inspect_network_request` (with initiator stack)
-- **Scripts**: `search_in_js_codes` / `get_script_source` / `dump_runtime_asset` / `extract_webpack_loader`
+- **Scripts**: `search_in_js_codes` / `get_script_source` / `dump_runtime_asset`
 - **C++ Native binding trace** *([kc-browser](https://github.com/KuiChi-x/kc-browser) only)*: auto-written under `<session>/_native_trace/**.jsonl` — hash pre-images + native leaf values for sandbox environment rebuild when CDP alone is not enough. Stock Chrome/Edge ignore the flag and emit nothing.
 </details>
 

@@ -130,7 +130,7 @@ MODEL=gpt-4o
 
 - **断点**：`set_line_breakpoint` / `break_on_request` / `get_paused_state` / `evaluate_in_call_frame` / `step_execution`
 - **网络**：`search_in_network_payloads` / `inspect_network_request`（含 initiator 调用栈）
-- **脚本**：`search_in_js_codes` / `get_script_source` / `dump_runtime_asset` / `extract_webpack_loader`
+- **脚本**：`search_in_js_codes` / `get_script_source` / `dump_runtime_asset`
 - **C++ Native binding trace**（仅 [kc-browser](https://github.com/KuiChi-x/kc-browser)）：自动落在 `<session>/_native_trace/**.jsonl` —— 指纹哈希明文输入 + 原生 API 叶子值；沙箱环境补齐卡住、CDP 不够用时直接当 oracle。普通 Chrome/Edge 会忽略该参数，不会产生文件
 </details>
 
