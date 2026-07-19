@@ -37,7 +37,7 @@ dependencies = [
     "curl_cffi",
     "tldextract",
     "langgraph-checkpoint-sqlite",
-    "SQLAlchemy0",
+    "SQLAlchemy",
     # Agent-generated crawlers are a core product capability, not an optional extra.
     "beautifulsoup4",
     "parsel",
