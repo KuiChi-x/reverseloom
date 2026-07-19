@@ -1,10 +1,9 @@
 import os
 from typing import Any, Dict, Optional
 
-os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
-
-import litellm
-from langchain_litellm import ChatLiteLLM
+from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models import BaseChatModel
+from langchain_openai import ChatOpenAI
 
 from graphloom import build_agent_graph
 
@@ -24,57 +23,55 @@ _SKILLS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "skills")
 _AVAILABLE_SKILLS = ["*"]
 _SKILLS_DIRS = [_SKILLS_DIR, str(default_skills_dir())]
 
-litellm.suppress_debug_info = True
-litellm.drop_params = True
-
 SYSTEM_PROMPT = SAFE_AUTHORIZATION_PROMPT + DELIVERY_STRATEGY_PROMPT + BROWSER_AGENT_SPECIFIC_RULES_PROMPT
 ALL_TOOLS = REVERSE_TOOLS + FILESYSTEM_TOOLS + AUTOMATION_TOOLS
 
-_EFFORT_THINKING_BUDGETS = {
-    "low": 1024,
-    "medium": 2048,
-    "high": 4096,
-    "xhigh": 8192,
-    "max": 16384,
-}
+_REASONING_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
 
-def build_llm() -> ChatLiteLLM:
-    """Construct the configured LiteLLM chat model."""
+def build_llm() -> BaseChatModel:
+    """Construct the configured OpenAI-compatible or Anthropic chat model."""
     protocol = os.environ.get("MODEL_PROTOCOL", "openai").strip()
-    model = f"{protocol}/{os.environ.get('MODEL', 'gpt-4o').strip()}"
+    if protocol not in {"openai", "openai/responses", "anthropic"}:
+        raise ValueError(f"Unsupported MODEL_PROTOCOL: {protocol}")
+    model_name = os.environ.get("MODEL", "gpt-4o").strip()
     kwargs: Dict[str, Any] = {
-        "model": model,
-        "api_base": os.environ.get("BASE_URL") or None,
+        "model": model_name,
+        "base_url": os.environ.get("BASE_URL") or None,
         "api_key": os.environ.get("OPENAI_API_KEY") or None,
         "streaming": True,
     }
-    model_kwargs: Dict[str, Any] = {}
-    model_kwargs["extra_body"] = {
-        "prompt_cache_key": (
-            os.environ.get("PROMPT_CACHE_KEY", "").strip() or f"reverseloom:{model}"
-        ),
-    }
-    retention = os.environ.get("PROMPT_CACHE_RETENTION", "24h").strip()
-    model_kwargs["extra_body"]["prompt_cache_retention"] = retention
-    model_kwargs["cache_control_injection_points"] = [
-        {"location": "message", "index": 1},
-    ]
-
     reasoning_effort = os.environ.get("MODEL_REASONING_EFFORT", "").strip().lower()
-    budget = _EFFORT_THINKING_BUDGETS.get(reasoning_effort)
-    if budget is not None:
-        model_kwargs["reasoning_effort"] = reasoning_effort
-        model_kwargs["thinking"] = {
-            "type": "enabled",
-            "budget_tokens": budget,
-        }
-    if model_kwargs:
-        kwargs["model_kwargs"] = model_kwargs
-    return ChatLiteLLM(**kwargs)
+    reasoning_enabled = reasoning_effort in _REASONING_EFFORTS
+
+    if protocol == "anthropic":
+        kwargs["model_kwargs"] = {"cache_control": {"type": "ephemeral"}}
+        if reasoning_enabled:
+            kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
+            kwargs["output_config"] = {"effort": reasoning_effort}
+        return ChatAnthropic(**kwargs)
+
+    kwargs["model_kwargs"] = {
+        "prompt_cache_key": (
+            os.environ.get("PROMPT_CACHE_KEY", "").strip()
+            or f"reverseloom:{protocol}/{model_name}"
+        ),
+        "prompt_cache_retention": "24h",
+    }
+    if protocol == "openai/responses":
+        kwargs["use_responses_api"] = True
+        kwargs["output_version"] = "responses/v1"
+        if reasoning_enabled:
+            kwargs["reasoning"] = {
+                "effort": reasoning_effort,
+                "summary": "detailed",
+            }
+    elif reasoning_enabled:
+        kwargs["reasoning_effort"] = reasoning_effort
+    return ChatOpenAI(**kwargs)
 
 
-def build_agent(llm: Optional[ChatLiteLLM] = None, checkpointer=None):
+def build_agent(llm: Optional[BaseChatModel] = None, checkpointer=None):
     """Compile the reverseloom agent graph: browser+reverse primary, general tools auxiliary.
 
     Tools drive the browser_manager singleton (keyed by session_id); the observer

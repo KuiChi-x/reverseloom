@@ -481,10 +481,10 @@ const I18N = {
   }
 };
 const EN_TEXT = {
-  '模型服务':'Model service', '配置 OpenAI 兼容接口和多模态模型。':'Configure an OpenAI-compatible endpoint and multimodal model.',
-  'LiteLLM 协议':'LiteLLM protocol', '选择 LiteLLM 供应商或 Responses 协议前缀。':'Choose a LiteLLM provider or Responses protocol prefix.', 'OpenAI / 兼容网关':'OpenAI / compatible gateway',
-  '思考强度':'Reasoning effort', 'low/medium/high/xhigh/max；Anthropic 会映射为内置 thinking budget。留空表示不强制思考。':'low/medium/high/xhigh/max; Anthropic maps this to its built-in thinking budget. Leave blank to use the provider default.', '默认（不强制）':'Default (not forced)',
-  '接口地址':'Endpoint URL', 'OpenAI 兼容 API 的 base URL。':'Base URL for the OpenAI-compatible API.', '只显示遮罩值，重新输入才会覆盖。':'Existing values are masked and only replaced when re-entered.', '模型':'Model', '必须支持图像输入和流式输出。':'Must support image input and streaming output.',
+  '模型服务':'Model service', '配置 OpenAI Chat、OpenAI Responses 或 Anthropic 模型接口。':'Configure an OpenAI Chat, OpenAI Responses, or Anthropic endpoint.',
+  '模型协议':'Model protocol', '选择 OpenAI Chat、OpenAI Responses 或 Anthropic。':'Choose OpenAI Chat, OpenAI Responses, or Anthropic.', 'OpenAI Chat / 兼容网关':'OpenAI Chat / compatible gateway',
+  '思考强度':'Reasoning effort', 'low/medium/high/xhigh/max；Anthropic 使用 adaptive thinking 和 output_config.effort。留空表示不强制思考。':'low/medium/high/xhigh/max; Anthropic uses adaptive thinking and output_config.effort. Leave blank to use the provider default.', '默认（不强制）':'Default (not forced)',
+  '接口地址':'Endpoint URL', '模型服务的 base URL。':'Base URL for the model service.', '只显示遮罩值，重新输入才会覆盖。':'Existing values are masked and only replaced when re-entered.', '模型':'Model', '必须支持图像输入和流式输出。':'Must support image input and streaming output.',
   '浏览器与隧道代理':'Browser and tunnel proxy', '指定 Chromium 内核，并通过本地认证隧道连接上游代理。':'Choose a Chromium executable and connect to an upstream proxy through a local authenticated tunnel.',
   '浏览器可执行文件':'Browser executable', '留空时自动探测系统 Chrome、Edge、Chromium 或 Brave；也可填写可执行文件绝对路径。':'Leave blank to detect Chrome, Edge, Chromium, or Brave automatically, or enter an absolute executable path.',
   '代理主机':'Proxy host', '远程 HTTP 代理的域名或 IP；浏览器会通过本地隧道转发。':'Domain or IP of the remote HTTP proxy; the browser connects through a local tunnel.', '代理端口':'Proxy port', '远程代理服务端口。':'Remote proxy service port.',

@@ -57,13 +57,13 @@ SETTINGS_GROUPS = [
         "id": "model",
         "label": "模型服务",
         "eyebrow": "MODEL RUNTIME",
-        "description": "配置 OpenAI 兼容接口和多模态模型。",
+        "description": "配置 OpenAI Chat、OpenAI Responses 或 Anthropic 模型接口。",
         "fields": [
-            _field("MODEL_PROTOCOL", "LiteLLM 协议", "选择 LiteLLM 供应商或 Responses 协议前缀。", field_type="select", default="openai", options=[{"value": "openai", "label": "OpenAI / 兼容网关"}, {"value": "openai/responses", "label": "OpenAI Responses"}, {"value": "anthropic", "label": "Anthropic Claude"}, {"value": "gemini", "label": "Google Gemini"}, {"value": "azure", "label": "Azure OpenAI"}, {"value": "azure/responses", "label": "Azure Responses"}, {"value": "openrouter", "label": "OpenRouter"}, {"value": "xai", "label": "xAI"}, {"value": "bedrock", "label": "AWS Bedrock"}, {"value": "vertex_ai", "label": "Vertex AI"}, {"value": "ollama", "label": "Ollama"}, {"value": "deepseek", "label": "DeepSeek"}, {"value": "groq", "label": "Groq"}, {"value": "mistral", "label": "Mistral"}, {"value": "together_ai", "label": "Together AI"}, {"value": "nvidia_nim", "label": "NVIDIA NIM"}], apply="reconnect"),
+            _field("MODEL_PROTOCOL", "模型协议", "选择 OpenAI Chat、OpenAI Responses 或 Anthropic。", field_type="select", default="openai", options=[{"value": "openai", "label": "OpenAI Chat / 兼容网关"}, {"value": "openai/responses", "label": "OpenAI Responses"}, {"value": "anthropic", "label": "Anthropic Claude"}], apply="reconnect"),
             _field(
                 "MODEL_REASONING_EFFORT",
                 "思考强度",
-                "low/medium/high/xhigh/max；Anthropic 会映射为内置 thinking budget。留空表示不强制思考。",
+                "low/medium/high/xhigh/max；Anthropic 使用 adaptive thinking 和 output_config.effort。留空表示不强制思考。",
                 field_type="select",
                 default="",
                 options=[
@@ -76,7 +76,7 @@ SETTINGS_GROUPS = [
                 ],
                 apply="reconnect",
             ),
-            _field("BASE_URL", "接口地址", "OpenAI 兼容 API 的 base URL。", placeholder="https://api.openai.com/v1", apply="reconnect"),
+            _field("BASE_URL", "接口地址", "模型服务的 base URL。", placeholder="https://api.openai.com/v1", apply="reconnect"),
             _field("OPENAI_API_KEY", "API Key", "只显示遮罩值，重新输入才会覆盖。", field_type="password", secret=True, apply="reconnect"),
             _field("MODEL", "模型", "必须支持图像输入和流式输出。", default="gpt-4o", placeholder="gpt-4o", apply="reconnect"),
         ],

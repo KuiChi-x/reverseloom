@@ -338,13 +338,8 @@ def test_settings_read_and_write(monkeypatch, tmp_path):
         assert protocol_field["type"] == "select"
         assert protocol_field["default"] == "openai"
         protocol_values = [option["value"] for option in protocol_field["options"]]
-        assert "openai" in protocol_values
-        assert "openai/responses" in protocol_values
-        assert "anthropic" in protocol_values
-        assert "vertex_ai" in protocol_values
-        assert "ollama" in protocol_values
-        assert reasoning_field["type"] == "text"
-        assert reasoning_field["placeholder"].endswith("max")
+        assert protocol_values == ["openai", "openai/responses", "anthropic"]
+        assert reasoning_field["type"] == "select"
 
         api_key = next(field for field in fields if field["key"] == "OPENAI_API_KEY")
         proxy_password = next(
@@ -373,7 +368,7 @@ def test_settings_read_and_write(monkeypatch, tmp_path):
         assert "65535" in invalid.json()["error"]
 
 
-def test_build_llm_builds_litellm_model_from_selected_protocol(monkeypatch):
+def test_build_llm_builds_anthropic_model(monkeypatch):
     from reverseloom.agent import build as build_module
 
     captured = {}
@@ -385,24 +380,21 @@ def test_build_llm_builds_litellm_model_from_selected_protocol(monkeypatch):
     monkeypatch.setenv("MODEL_PROTOCOL", "anthropic")
     monkeypatch.setenv("BASE_URL", "https://example.invalid")
     monkeypatch.setenv("OPENAI_API_KEY", "provider-key")
-    monkeypatch.setenv("MODEL", "claude-sonnet-test")
-    monkeypatch.delenv("MODEL_REASONING_EFFORT", raising=False)
+    monkeypatch.setenv("MODEL", "claude-opus-4-8")
+    monkeypatch.setenv("MODEL_REASONING_EFFORT", "xhigh")
     monkeypatch.delenv("PROMPT_CACHE_KEY", raising=False)
-    monkeypatch.delenv("PROMPT_CACHE_RETENTION", raising=False)
-    monkeypatch.setattr(build_module, "ChatLiteLLM", FakeChatModel)
+    monkeypatch.setattr(build_module, "ChatAnthropic", FakeChatModel)
 
     build_module.build_llm()
 
     assert captured == {
-        "model": "anthropic/claude-sonnet-test",
-        "api_base": "https://example.invalid",
+        "model": "claude-opus-4-8",
+        "base_url": "https://example.invalid",
         "api_key": "provider-key",
         "streaming": True,
-        "model_kwargs": {
-            "cache_control_injection_points": [
-                {"location": "message", "index": 1},
-            ],
-        },
+        "model_kwargs": {"cache_control": {"type": "ephemeral"}},
+        "thinking": {"type": "adaptive", "display": "summarized"},
+        "output_config": {"effort": "xhigh"},
     }
 
 
@@ -417,11 +409,11 @@ def test_build_llm_defaults_to_openai_compatible_protocol(monkeypatch):
 
     monkeypatch.delenv("MODEL_PROTOCOL", raising=False)
     monkeypatch.setenv("MODEL", "legacy-internal-model")
-    monkeypatch.setattr(build_module, "ChatLiteLLM", FakeChatModel)
+    monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
 
     build_module.build_llm()
 
-    assert captured["model"] == "openai/legacy-internal-model"
+    assert captured["model"] == "legacy-internal-model"
 
 
 def test_build_llm_passes_configured_reasoning_effort(monkeypatch):
@@ -433,61 +425,50 @@ def test_build_llm_passes_configured_reasoning_effort(monkeypatch):
         def __init__(self, **kwargs):
             captured.update(kwargs)
 
-    monkeypatch.setenv("MODEL_PROTOCOL", "xai")
+    monkeypatch.setenv("MODEL_PROTOCOL", "openai")
     monkeypatch.setenv("MODEL", "grok-test")
     monkeypatch.setenv("MODEL_REASONING_EFFORT", "max")
-    monkeypatch.setattr(build_module, "ChatLiteLLM", FakeChatModel)
+    monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
 
     build_module.build_llm()
 
-    assert captured["model"] == "xai/grok-test"
-    assert captured["model_kwargs"] == {"reasoning_effort": "max"}
+    assert captured["model"] == "grok-test"
+    assert captured["reasoning_effort"] == "max"
 
 
 
-def test_build_llm_enables_litellm_unsupported_parameter_dropping():
-    import litellm
+def test_build_llm_uses_openai_responses_api_with_24h_prompt_cache(monkeypatch):
+    from reverseloom.agent import build as build_module
 
-    from reverseloom.agent.build import build_llm
+    captured = {}
 
-    assert litellm.drop_params is True
-    assert build_llm is not None
+    class FakeChatModel:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
 
+    monkeypatch.setenv("MODEL_PROTOCOL", "openai/responses")
+    monkeypatch.setenv("MODEL", "gpt-test")
+    monkeypatch.setenv("MODEL_REASONING_EFFORT", "high")
+    monkeypatch.setenv("PROMPT_CACHE_KEY", "session-test")
+    monkeypatch.delenv("BASE_URL", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
 
+    build_module.build_llm()
 
-def test_litellm_chunks_preserve_reasoning_and_tool_calls_for_graphloom():
-    from langchain_core.messages import AIMessageChunk
-    from langchain_litellm.chat_models.litellm import _convert_delta_to_message_chunk
-
-    reasoning_chunk = _convert_delta_to_message_chunk(
-        {
-            "role": "assistant",
-            "content": "",
-            "reasoning_content": "inspect the page",
+    assert captured == {
+        "model": "gpt-test",
+        "base_url": None,
+        "api_key": None,
+        "streaming": True,
+        "use_responses_api": True,
+        "output_version": "responses/v1",
+        "reasoning": {"effort": "high", "summary": "detailed"},
+        "model_kwargs": {
+            "prompt_cache_key": "session-test",
+            "prompt_cache_retention": "24h",
         },
-        AIMessageChunk,
-    )
-    tool_chunk = _convert_delta_to_message_chunk(
-        {
-            "role": "assistant",
-            "content": "",
-            "tool_calls": [
-                {
-                    "index": 0,
-                    "id": "call_probe",
-                    "function": {
-                        "name": "protocol_probe",
-                        "arguments": '{"value":"OK"}',
-                    },
-                }
-            ],
-        },
-        AIMessageChunk,
-    )
-
-    assert reasoning_chunk.additional_kwargs["reasoning_content"] == "inspect the page"
-    assert tool_chunk.tool_call_chunks[0]["name"] == "protocol_probe"
-    assert tool_chunk.tool_call_chunks[0]["args"] == '{"value":"OK"}'
+    }
 
 
 def test_authenticated_proxy_settings_feed_local_tunnel(monkeypatch):
