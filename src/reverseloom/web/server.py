@@ -531,23 +531,12 @@ def create_app() -> FastAPI:
 
             streamed_reply_parts: list[str] = []
 
-            async def _emit(event_type, payload):
-                if event_type == "ai_delta":
-                    reasoning = str(payload.get("reasoning") or "")
-                    content = str(payload.get("content") or "")
-                    if reasoning:
-                        await _send_run(run_session_id, {"type": "reasoning", "text": reasoning})
-                    if content:
-                        streamed_reply_parts.append(content)
-                        await _send_run(run_session_id, {"type": "token", "text": content})
-                elif event_type == "step_planned":
-                    await _send_run(run_session_id, {"type": "step_start", **payload})
-                elif event_type == "tool_start":
-                    await _send_run(run_session_id, {"type": "tool_start", **payload})
-                elif event_type == "tool_end":
-                    await _send_run(run_session_id, {"type": "tool_end", **payload})
-                elif event_type == "step_done":
-                    await _send_run(run_session_id, {"type": "step_done", **payload})
+            from reverseloom.web.event_emitter import ReverseEventEmitter
+            emitter = ReverseEventEmitter(
+                session_id=run_session_id,
+                send=_send_run,
+                streamed_reply_parts=streamed_reply_parts,
+            )
 
             run_config = {
                 "recursion_limit": 1000,
@@ -555,7 +544,7 @@ def create_app() -> FastAPI:
                     "thread_id": run_session_id,
                     "checkpoint_ns": "",
                     "cancel_event": cancel_event,
-                    "event_emitter": _emit,
+                    "event_emitter": emitter,
                     "runtime_context": {
                         "artifact_dir": artifact_directory,
                         "user_id": config.cookie_user_id(run_session_id),

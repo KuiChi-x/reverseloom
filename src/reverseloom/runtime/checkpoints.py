@@ -96,14 +96,83 @@ class CheckpointerManager:
         return saver
 
     async def prune_thread(self, thread_id: str) -> None:
-        """Keep only the latest checkpoint per namespace for this thread
-        """
-        if self.checkpointer is None:
+        """Keep only the latest checkpoint per namespace (official aprune is NotImplemented)."""
+        if not thread_id or self.checkpointer is None:
             return
         try:
             await self.checkpointer.aprune([thread_id], strategy="keep_latest")
+            return
         except Exception:
-            pass
+            pass  # fall through to SQL below
+
+        # checkpoint_id is time-sortable UUIDv6; keep MAX per ns, drop orphan writes/blobs.
+        if self.backend == "sqlite" and self._conn is not None:
+            await self._conn.execute(
+                """
+                DELETE FROM checkpoints
+                WHERE thread_id = ?
+                  AND (checkpoint_ns, checkpoint_id) NOT IN (
+                    SELECT checkpoint_ns, checkpoint_id FROM (
+                      SELECT checkpoint_ns, MAX(checkpoint_id) AS checkpoint_id
+                      FROM checkpoints WHERE thread_id = ? GROUP BY checkpoint_ns
+                    )
+                  )
+                """,
+                (thread_id, thread_id),
+            )
+            await self._conn.execute(
+                """
+                DELETE FROM writes
+                WHERE thread_id = ?
+                  AND NOT EXISTS (
+                    SELECT 1 FROM checkpoints c
+                    WHERE c.thread_id = writes.thread_id
+                      AND c.checkpoint_ns = writes.checkpoint_ns
+                      AND c.checkpoint_id = writes.checkpoint_id
+                  )
+                """,
+                (thread_id,),
+            )
+            await self._conn.commit()
+        elif self.backend == "postgres" and self._pool is not None:
+            async with self._pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        DELETE FROM checkpoints
+                        WHERE thread_id = %s
+                          AND (checkpoint_ns, checkpoint_id) NOT IN (
+                            SELECT checkpoint_ns, MAX(checkpoint_id)
+                            FROM checkpoints WHERE thread_id = %s GROUP BY checkpoint_ns
+                          )
+                        """,
+                        (thread_id, thread_id),
+                    )
+                    await cur.execute(
+                        """
+                        DELETE FROM checkpoint_writes w
+                        WHERE w.thread_id = %s
+                          AND NOT EXISTS (
+                            SELECT 1 FROM checkpoints c
+                            WHERE c.thread_id = w.thread_id
+                              AND c.checkpoint_ns = w.checkpoint_ns
+                              AND c.checkpoint_id = w.checkpoint_id
+                          )
+                        """,
+                        (thread_id,),
+                    )
+                    await cur.execute(
+                        """
+                        DELETE FROM checkpoint_blobs b
+                        WHERE b.thread_id = %s
+                          AND NOT EXISTS (
+                            SELECT 1 FROM checkpoints c
+                            WHERE c.thread_id = b.thread_id
+                              AND c.checkpoint_ns = b.checkpoint_ns
+                          )
+                        """,
+                        (thread_id,),
+                    )
 
     async def close(self) -> None:
         if self._conn is not None:

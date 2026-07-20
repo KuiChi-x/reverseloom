@@ -56,6 +56,11 @@ At completion:
 
 ## Format selection
 
+Format is independent of size: a small result can still be requested as an Excel
+file, and a large collection can still be asked for as JSON. Decide the format
+from the user's request, and the size only decides whether data flows through
+disk (see the SKILL's context discipline).
+
 | Need | Preferred format |
 |---|---|
 | Small human-readable table | XLSX or direct answer |
@@ -65,6 +70,16 @@ At completion:
 | Large analytical dataset | Parquet, inspected with DuckDB |
 
 Use the format requested by the user when practical. If the requested format cannot represent the volume safely, explain the constraint and provide a compatible split or companion format.
+
+## Delivering a downloaded file as-is
+
+When the source was a ready file (Excel/CSV/PDF/ZIP the page offered) and the
+user wants that file — not fields from inside it — deliver the downloaded file
+unchanged. Do not re-serialize it through model context or rebuild it from
+scraped rows; the original export is authoritative. Save it to the artifact
+directory and hand off the path. Only when the user needs specific fields do you
+parse it (see `references/source-selection.md`) and then choose an output format
+above.
 
 ## CSV
 

@@ -1,57 +1,78 @@
 ---
 name: web-crawl
-description: "Collect data from websites and deliver the result with the least necessary complexity. Use for quick lookups, visible-page extraction, search results, tables, pagination, detail-page traversal, downloadable data, reusable crawler generation, bulk collection, and CSV/JSONL/SQLite/XLSX/Parquet output. Return small results directly; generate and run crawler code only when the task requires multiple requests, repeatability, files, validation, or substantial volume."
+description: "Get data from websites with the least necessary complexity. Use for quick lookups, visible-page extraction, search results, tables, pagination, detail-page traversal, downloadable files (Excel/CSV/PDF/ZIP), embedded page state, internal JSON/XHR APIs, bulk collection, reusable crawler generation, and delivery in any format (text / Excel / CSV / JSON / JSONL / SQLite / Parquet). Return small results directly; write large or record-set data to disk and return only progress, samples, and paths."
 ---
 
 # Web Crawl
 
-Satisfy the user's data need with the cheapest reliable path. Do not turn a small lookup into a crawler project.
+Get the user's data by the cheapest reliable path, and never let bulk data flow back into your own context.
 
-## Effort ladder
+## Context discipline (the one rule everything else serves)
 
-Choose the first level that can completely satisfy the request:
+Your context window is small and shared with page state and screenshots. Bulk data must go to disk, not into your context.
 
-1. **Direct answer** → If the requested data is already visible in the current browser state or can be obtained with a few browser actions and is small enough to present clearly, return it directly. Do not create files or code unless requested.
-2. **Interactive extraction** → Use browser navigation, DOM state, embedded page data, downloads, or existing network responses. Return modest results directly or save the requested file.
-3. **Crawler execution** → Generate a crawler only when the task spans many pages or records, needs reproducibility, requires structured files, must resume after failure, or the user explicitly asks for code.
-4. **Deep reverse engineering** → Load `deep-reverse` only when ordinary browser observation and crawler construction are blocked by unresolved signatures, encryption, dynamic tokens, or browser-independent replay requirements.
+Route by the size of the result you are about to handle:
 
-Never skip to a higher level merely because it is more general or technically interesting.
+- **> 30000 characters, OR > 500 rows/records → collection mode.** The data must be written to disk (via a tool or a generated script). Into your context return ONLY: progress, counts, a sample of at most 20 records, and file paths. Never read the full dataset back.
+- **Otherwise → observation mode.** The result is small enough to hold and present directly.
 
-## Workflow
+A stream of records you are accumulating is a dataset, not an answer: once it will cross either threshold, switch to collection mode before it grows — do not first gather everything in context and then decide.
 
-1. Identify the requested fields, scope, freshness, filters, and desired presentation. Ask only for information that materially changes execution.
-2. Inspect the page and obtain a representative sample before choosing an implementation.
-3. Select the simplest complete source in this order:
-   - existing download or export;
-   - stable JSON/data response;
-   - embedded page state;
-   - rendered DOM;
-   - browser-driven traversal;
-   - deep reverse engineering.
-4. For a direct answer, verify the visible values, state any material omissions, and stop.
-5. For a crawler, read `references/crawler-engineering.md`, create the files in the session artifact directory, and run a pilot through `run_shell`.
-6. For structured output or more than a trivial number of records, read `references/data-output-validation.md` and validate the pilot before full execution.
-7. Run the crawler with explicit `cwd` and an appropriate `timeout_seconds`. Keep data on disk; return only progress, samples, counts, and paths to the model.
-8. Deliver the user-facing result, crawler source when generated, output files, and a concise validation report.
+## Q1 · Mode
 
-## Direct-answer rules
+- **Observation mode** — small result. Read it in the current session and answer directly. Do not create files or write code.
+- **Collection mode** — large result or a growing record set. Locate the data source, write data to disk incrementally, and return only progress / samples / paths.
 
-- Prefer a clear answer over an artifact when the result is small and the user did not request a file.
-- Preserve source labels, units, currencies, dates, time zones, and ranking order.
-- Do not claim completeness beyond what was observed.
-- Do not generate a crawler for a single value, a short list, or one visible table unless reuse or automation was requested.
+## Q2 · Source (collection mode) — take the cheapest that is complete
 
-## Crawler rules
+Prefer sources in this order; earlier ones are cheaper, more reliable, and scale better:
 
-- Write crawler code before running it; do not assemble large programs inside shell commands.
-- Use `curl_cffi` for HTTP collection and Patchright for browser-driven collection.
-- Include timeouts, bounded retries, rate limiting, deterministic pagination, checkpointing when useful, deduplication, and structured logging.
-- Never accumulate bulk output in model context or shell stdout.
-- Write output incrementally and make reruns idempotent when the task is non-trivial.
-- Keep credentials and secrets out of source files and output data.
+1. **A ready file** — a page download/export link (Excel, CSV, JSON, PDF, ZIP). Fetch the file directly instead of scraping the DOM; it is already structured and one request wide. If the user needs fields from inside it, download then parse it with a script.
+2. **An internal JSON / XHR API** — the request the page itself makes to render data. You are in a real authenticated session: reuse the session's existing cookies, headers, and tokens as observed — copy them into an HTTP client (e.g. `curl_cffi`). Do not reconstruct auth from scratch.
+3. **Embedded page state** — inline JSON the page ships (e.g. `__NEXT_DATA__`, `window.__INITIAL_STATE__`, a `<script type="application/json">`). Read it once; it often contains the whole list without pagination.
+4. **Rendered DOM / browser-driven traversal** — last resort. Paginate and write each batch to disk as you go. For tens of thousands of records this is the worst path — exhaust 1–3 first.
+
+## Q3 · Delivery format (independent of size)
+
+Produce what the user asked for, whatever the mode:
+
+- a direct text answer (small results only);
+- a specific format — Excel, CSV, JSON, JSONL, SQLite, Parquet;
+- reusable crawler source code (only when the user asked for code);
+- a page's own downloaded file, delivered as-is.
+
+Format is a separate decision from size — a short result can still be requested as an Excel file. See `references/data-output-validation.md`.
+
+## Observation mode
+
+1. Identify the requested fields, scope, filters, and desired presentation.
+2. Reach the data (navigate, filter/search, scroll, or read an embedded/JSON source).
+3. Verify the visible values against the page; state any material omission.
+4. Answer directly, or save the one requested file if the user asked for a file.
+
+Keep it to a few actions. Do not build a crawler for a single value, a short list, or one visible table unless reuse was requested.
+
+## Collection mode
+
+1. Sample first: inspect one page / cursor / segment and confirm the source and shape before scaling.
+2. Locate the source by the Q2 order; capture the request shape and the session's existing credentials from observation — do not guess hidden inputs.
+3. Read `references/crawler-engineering.md`, then generate a resumable collector with `write_artifact` and pilot it with `run_shell`. The collector writes records to disk; its stdout is progress only.
+4. Read `references/data-output-validation.md`, validate the pilot against source evidence, then run the full collection.
+5. Throughout, return to your context only: progress, counts, a sample of ≤20 records, and paths. Never return or read back the full dataset.
+6. Deliver the output file(s) and a concise validation summary; the final reply summarizes, it does not contain the dataset.
+
+## When you are blocked
+
+Browser blockers are operational, not cryptographic — you already hold the real session, so reuse its cookies/tokens rather than reconstructing anything.
+
+- **Login wall** — authenticate if credentials are available; otherwise stop and report.
+- **CAPTCHA / human check** — request human help if that path exists; otherwise stop and report.
+- **Rate limiting / IP block (403/429)** — back off; do not hammer the same URL. If it persists, stop and report what was collected.
+
+Report the blocker with the endpoint/page, what you observed, and the data collected so far. Deliver partial results rather than fabricating.
 
 ## Reference map
 
-- `references/crawler-engineering.md`: Read before generating or running crawler code, including HTTP, browser-driven, pagination, checkpoint, retry, and execution patterns.
-- `references/data-output-validation.md`: Read when producing files, collecting multiple pages, handling substantial volume, or validating CSV, JSONL, SQLite, XLSX, or Parquet output.
+- `references/source-selection.md`: How to identify and fetch each source — download links, internal JSON/API with reused session credentials, embedded state, and parsing downloaded files for fields.
+- `references/crawler-engineering.md`: Read before generating or running a collector — HTTP, browser-driven, pagination, checkpointing, retries, and disk-only data flow.
+- `references/data-output-validation.md`: Read when producing files or validating output — format selection (CSV / JSONL / SQLite / XLSX / Parquet), delivering a downloaded file as-is, and validation.

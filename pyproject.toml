@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "graphloom>=0.1.9",
+    "graphloom>=0.1.11",
     "langchain-openai",
     "langchain-anthropic",
     "fastapi",

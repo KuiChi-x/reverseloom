@@ -11,20 +11,35 @@
 - [Shell execution](#shell-execution)
 - [Completion criteria](#completion-criteria)
 
+This reference covers collection mode. Choose the source first (see
+`references/source-selection.md`): a ready download file or an internal JSON/API
+beats DOM traversal for anything at scale. The patterns below apply once the
+source is chosen.
+
+## The disk-only rule
+
+Bulk data never enters model context. The collector writes records straight to
+disk; stdout carries progress only. You return counts, a small sample (≤20
+records), and file paths — never the dataset. This holds for every pattern
+below: extraction, pagination, retries, validation, and delivery.
+
 ## Strategy selection
 
 Use the least expensive implementation that preserves correctness:
 
 | Situation | Preferred implementation |
 |---|---|
-| A few visible values | Browser actions and direct answer |
-| Existing export button | Trigger or reproduce the export |
-| Stable JSON response | HTTP crawler with `curl_cffi` |
-| Login plus normal navigation | Patchright browser crawler (only when the user explicitly asked for browser automation; otherwise reproduce the auth in an HTTP client) |
+| A few visible values | Browser actions and direct answer (observation mode) |
+| Existing download/export file | Fetch the file directly; parse it if fields are needed |
+| Data-bearing internal JSON/API | HTTP collector with `curl_cffi`, reusing the session's cookies/headers |
+| Data only in rendered DOM | Browser-driven traversal, writing each batch to disk |
 | Many detail pages | Queue URLs and checkpoint progress |
-| Unknown signing or encryption | Load `deep-reverse` before implementing |
+| A required value is computed and not observable anywhere in the session | Out of scope (signing/encryption) — report the blocker and deliver what was collected |
 
-For a one-time need you may drive the browser yourself and return the observed data without building a crawler. But any crawler you deliver is browser-independent by default: do not deliver, or shell out to, browser automation to collect data or to mint a token/signature/cookie unless the user explicitly asked for browser automation. When a plain HTTP request is blocked by signing, tokens, or encryption, load `deep-reverse` and reproduce the value in code rather than driving a browser to produce it.
+Reuse the live session's existing cookies, headers, and tokens when replaying a
+request — they are observable session state, not something to reconstruct. Only
+when a required value is genuinely computed and absent from every cookie,
+header, response, and embedded state is it out of scope; stop and report it.
 
 ## Project layout
 
@@ -56,11 +71,11 @@ Required properties:
 - no secrets embedded in source;
 - concise progress logging.
 
-Build the request from observed evidence. Do not guess hidden headers or signing inputs. Load `deep-reverse` when required values cannot be regenerated reliably.
+Build the request from observed evidence. Do not guess hidden headers or signing inputs. If a required value cannot be regenerated reliably, stop and report the blocker instead of guessing or driving a browser to produce it.
 
 ## Browser crawlers
 
-Deliver a Patchright browser crawler ONLY when the user explicitly asked for browser automation. In the default analysis scenario a browser-driven crawler is an incomplete deliverable — reproduce the workflow in a browser-independent HTTP client instead, and load `deep-reverse` if signing or tokens block it. The patterns below apply when browser automation was explicitly requested.
+Deliver a Patchright browser crawler ONLY when the user explicitly asked for browser automation. In the default analysis scenario a browser-driven crawler is an incomplete deliverable — reproduce the workflow in a browser-independent HTTP client instead. If signing or tokens block reproduction and you cannot regenerate the value from observed evidence, stop and report the blocker. The patterns below apply when browser automation was explicitly requested.
 
 Use Patchright when the workflow depends on rendered DOM, user interactions, browser login state, downloads, or browser-only state.
 
@@ -70,7 +85,7 @@ Required properties:
 - wait for specific page conditions rather than arbitrary long sleeps;
 - close pages and contexts in `finally` blocks;
 - extract structured values in-page and write them immediately;
-- cap parallel pages to avoid memory growth;
+- cap concurrent pages to avoid memory growth;
 - preserve the user-visible ordering when it matters;
 - save failure URLs and reasons for later retry.
 
@@ -111,7 +126,7 @@ Write data before advancing the checkpoint. Make duplicate writes harmless throu
 
 ## Shell execution
 
-Use `write_file` or `write_artifact` to create readable source files, then execute them with `run_shell` from the artifact directory.
+Use `write_artifact` to create readable source files, then execute them with `run_shell` from the artifact directory.
 
 Pilot example:
 
@@ -127,12 +142,7 @@ python crawler.py --resume --output output/data.jsonl
 
 Before the pilot, verify only the imports required by the generated crawler. Do not install packages silently; report a missing runtime dependency or use a simpler available format.
 
-Set `timeout_seconds` according to the expected run. Keep stdout to progress summaries; write records and verbose logs to files. The shell environment provides:
-
-- `REVERSELOOM_ARTIFACT_DIR`;
-- `python` / `python3` on `PATH` resolve to reverseloom's own interpreter (with bundled deps such as `curl_cffi`) in every install mode; `REVERSELOOM_PYTHON_PATH` also points to it;
-- `REVERSELOOM_NODE_PATH` when Patchright's bundled Node is available;
-- `NODE_PATH` for the bundled sandbox runtime (mount the engine itself via `run_shell(runtime_files=["reverseloom-sandbox.bundle.js"])`).
+Set `timeout_seconds` according to the expected run. Keep stdout to progress summaries; write records and verbose logs to files. Run scripts with `python`/`python3` and the HTTP libraries available in the environment (e.g. `curl_cffi`); if a dependency is missing, report it or fall back to a simpler available format rather than installing silently.
 
 ## Completion criteria
 
