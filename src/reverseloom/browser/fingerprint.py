@@ -140,8 +140,11 @@ class FingerprintManager:
             "--start-maximized",
         ]
         if trace_dir:
-            args.append(f"--fp-native-trace-dir={trace_dir}")
+            abs_trace_dir = os.path.abspath(trace_dir)
+            if os.name == "nt":
+                abs_trace_dir = abs_trace_dir.replace("\\", "/")
             args.append("--no-sandbox")
+            args.append(f"--fp-native-trace-dir={abs_trace_dir}")
         return args
 
     @classmethod
