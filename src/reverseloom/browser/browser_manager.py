@@ -4,7 +4,13 @@ import os
 from typing import Dict, Any, Optional, List
 from patchright.async_api import async_playwright, Page, BrowserContext, Playwright, ProxySettings
 
-from reverseloom.runtime.config import SESSION_BASE_DIR, BROWSER_EXECUTABLE_PATH, UPSTREAM_PROXY_URL, cookie_user_id
+from reverseloom.runtime.config import (
+    SESSION_BASE_DIR,
+    BROWSER_EXECUTABLE_PATH,
+    UPSTREAM_PROXY_URL,
+    cookie_user_id,
+    is_browser_headless,
+)
 from reverseloom.browser.discovery import resolve_browser_executable
 from reverseloom.browser.fingerprint import FingerprintManager
 from reverseloom.browser.proxy import ProxyManager
@@ -72,44 +78,38 @@ class BrowserManager:
             proxy_config = ProxySettings(server=f"http://127.0.0.1:{tunnel.local_port}")
             logging.info(f"session_id:{session_id}, using proxy tunnel on port {tunnel.local_port}")
 
-        # 3. Launch browser with a PERSISTENT context for per-session isolation.
+        # 3. Launch an ephemeral browser (no per-session user_data_dir).
         executable_path = resolve_browser_executable(BROWSER_EXECUTABLE_PATH)
         trace_dir = os.path.abspath(os.path.join(SESSION_BASE_DIR, session_id, "_native_trace"))
         os.makedirs(trace_dir, exist_ok=True)
         launch_args = FingerprintManager.get_launch_args(fingerprint, trace_dir=trace_dir)
-        user_data_dir = os.path.join(SESSION_BASE_DIR, session_id, "profile")
-        os.makedirs(user_data_dir, exist_ok=True)
 
-        logging.info(f"[BrowserManager] Launching persistent context for session {session_id}...")
-        logging.info(f"User data dir: {user_data_dir}")
+        headless = is_browser_headless()
+        logging.info(f"[BrowserManager] Launching browser for session {session_id}...")
         logging.info(f"Executable path: {executable_path}")
+        logging.info(f"Headless: {headless}")
         logging.info(f"Launch args: {launch_args}")
 
         launch_kwargs: Dict[str, Any] = {
-            "user_data_dir": user_data_dir,
-            "headless": False,
+            "headless": headless,
             "args": launch_args,
-            "no_viewport": True,
+            "executable_path": executable_path,
         }
-        launch_kwargs["executable_path"] = executable_path
-        if proxy_config:
-            launch_kwargs["proxy"] = proxy_config
 
         try:
-            context = await self.playwright.chromium.launch_persistent_context(**launch_kwargs)
+            browser = await self.playwright.chromium.launch(**launch_kwargs)
+            context_kwargs: Dict[str, Any] = {"no_viewport": True}
+            if proxy_config:
+                context_kwargs["proxy"] = proxy_config
+            context = await browser.new_context(**context_kwargs)
             logging.info(f"[BrowserManager] Browser launched successfully for session {session_id}.")
         except Exception as e:
             logging.error(f"[BrowserManager] Failed to launch browser: {e}")
             raise
 
-        # A persistent context usually opens one page by default
-        if context.pages:
-            page = context.pages[0]
-        else:
-            page = await context.new_page()
+        page = await context.new_page()
 
         # Capture login changes from already-open conversations before starting
-        # another isolated browser profile for the same desktop user.
         await self.sync_user_cookies(user_id, inject=False)
 
         # Inject this user's persisted login state so the session starts authenticated.
@@ -117,8 +117,9 @@ class BrowserManager:
         if global_cookies:
             await context.add_cookies(global_cookies)
 
-        # 4. Build Session Object
+        # 4. Build Session Object (browser closed explicitly in BrowserSession.close)
         session = BrowserSession(session_id, user_id, context, page)
+        session.browser = browser
 
         logging.info(f"[BrowserManager] Initializing CDP for session {session_id}...")
         await session.init_cdp()

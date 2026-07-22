@@ -30,6 +30,14 @@ SESSION_BASE_DIR: str = os.path.abspath(str(default_session_dir()))
 # patchright launches this instead of downloading its own Chromium.
 BROWSER_EXECUTABLE_PATH: str = os.environ.get("REVERSELOOM_BROWSER_PATH", "")
 
+
+def is_browser_headless() -> bool:
+    """Whether new browser sessions should launch headless.
+    """
+    raw = os.environ.get("REVERSELOOM_BROWSER_HEADLESS", "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
 def build_proxy_url_from_env() -> str:
     """Build the authenticated upstream URL consumed by the local tunnel."""
     host = os.environ.get("REVERSELOOM_PROXY_HOST", "").strip()

@@ -88,6 +88,13 @@ SETTINGS_GROUPS = [
         "description": "指定 Chromium 内核，并通过本地认证隧道连接上游代理。",
         "fields": [
             _field("REVERSELOOM_BROWSER_PATH", "浏览器可执行文件", "留空时自动探测系统 Chrome、Edge、Chromium 或 Brave；也可填写可执行文件绝对路径。", placeholder=BROWSER_PATH_PLACEHOLDER),
+            _field(
+                "REVERSELOOM_BROWSER_HEADLESS",
+                "无头模式",
+                "关闭：弹出可见浏览器窗口（默认，适合观察/人工介入）；开启：无界面运行（适合后台批量）。对已打开的会话不生效，需新开对话。",
+                field_type="switch",
+                default="0",
+            ),
             _field("REVERSELOOM_PROXY_HOST", "代理主机", "远程 HTTP 代理的域名或 IP；浏览器会通过本地隧道转发。", placeholder="proxy.example.com"),
             _field("REVERSELOOM_PROXY_PORT", "代理端口", "远程代理服务端口。", field_type="number", minimum=1, maximum=65535, step=1),
             _field("REVERSELOOM_PROXY_USERNAME", "代理用户名", "由本地隧道注入 Proxy-Authorization，不直接交给 Chromium。"),
