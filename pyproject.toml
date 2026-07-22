@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reverseloom"
-version = "0.1.0"
+version = "0.1.3"
 description = "A local, open-source deep browser automation + web reverse-engineering agent with a desktop UI, woven on the graphloom agent framework."
 readme = "README.md"
 requires-python = ">=3.10"
