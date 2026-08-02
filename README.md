@@ -98,7 +98,7 @@ In the UI under **Settings → Model**, or via `.env`. The model must support **
 <div align="center"><img src="docs/image/model_setting.png" alt="Model settings screen" width="720" /></div>
 
 ```dotenv
-MODEL_PROTOCOL=openai          # openai / anthropic / gemini / deepseek / ollama
+MODEL_PROTOCOL=openai/responses # openai/responses / anthropic
 BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=sk-...
 MODEL=gpt-4o

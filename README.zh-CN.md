@@ -98,7 +98,7 @@ Node 沙箱已内置预构建（`reverseloom-sandbox.bundle.js`），开箱即�
 <div align="center"><img src="docs/image/model_setting.png" alt="模型配置界面" width="720" /></div>
 
 ```dotenv
-MODEL_PROTOCOL=openai          # openai / anthropic / gemini / deepseek / ollama
+MODEL_PROTOCOL=openai/responses # openai/responses / anthropic
 BASE_URL=https://api.openai.com/v1
 OPENAI_API_KEY=sk-...
 MODEL=gpt-4o

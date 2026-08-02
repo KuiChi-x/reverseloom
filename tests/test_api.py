@@ -336,9 +336,9 @@ def test_settings_read_and_write(monkeypatch, tmp_path):
             field for field in fields if field["key"] == "MODEL_REASONING_EFFORT"
         )
         assert protocol_field["type"] == "select"
-        assert protocol_field["default"] == "openai"
+        assert protocol_field["default"] == "openai/responses"
         protocol_values = [option["value"] for option in protocol_field["options"]]
-        assert protocol_values == ["openai", "openai/responses", "anthropic"]
+        assert protocol_values == ["openai/responses", "anthropic"]
         assert reasoning_field["type"] == "select"
 
         api_key = next(field for field in fields if field["key"] == "OPENAI_API_KEY")
@@ -382,7 +382,6 @@ def test_build_llm_builds_anthropic_model(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "provider-key")
     monkeypatch.setenv("MODEL", "claude-opus-4-8")
     monkeypatch.setenv("MODEL_REASONING_EFFORT", "xhigh")
-    monkeypatch.delenv("PROMPT_CACHE_KEY", raising=False)
     monkeypatch.setattr(build_module, "ChatAnthropic", FakeChatModel)
 
     build_module.build_llm()
@@ -392,13 +391,13 @@ def test_build_llm_builds_anthropic_model(monkeypatch):
         "base_url": "https://example.invalid",
         "api_key": "provider-key",
         "streaming": True,
-        "model_kwargs": {"cache_control": {"type": "ephemeral"}},
+        "betas": ["context-management-2025-06-27"],
         "thinking": {"type": "adaptive", "display": "summarized"},
         "output_config": {"effort": "xhigh"},
     }
 
 
-def test_build_llm_defaults_to_openai_compatible_protocol(monkeypatch):
+def test_build_llm_defaults_to_openai_responses(monkeypatch):
     from reverseloom.agent import build as build_module
 
     captured = {}
@@ -408,54 +407,18 @@ def test_build_llm_defaults_to_openai_compatible_protocol(monkeypatch):
             captured.update(kwargs)
 
     monkeypatch.delenv("MODEL_PROTOCOL", raising=False)
-    monkeypatch.setenv("MODEL", "legacy-internal-model")
-    monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
-
-    build_module.build_llm()
-
-    assert captured["model"] == "legacy-internal-model"
-
-
-def test_build_llm_passes_configured_reasoning_effort(monkeypatch):
-    from reverseloom.agent import build as build_module
-
-    captured = {}
-
-    class FakeChatModel:
-        def __init__(self, **kwargs):
-            captured.update(kwargs)
-
-    monkeypatch.setenv("MODEL_PROTOCOL", "openai")
-    monkeypatch.setenv("MODEL", "grok-test")
-    monkeypatch.setenv("MODEL_REASONING_EFFORT", "max")
-    monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
-
-    build_module.build_llm()
-
-    assert captured["model"] == "grok-test"
-    assert captured["reasoning_effort"] == "max"
-
-
-
-def test_build_llm_uses_openai_responses_api_with_24h_prompt_cache(monkeypatch):
-    from reverseloom.agent import build as build_module
-
-    captured = {}
-
-    class FakeChatModel:
-        def __init__(self, **kwargs):
-            captured.update(kwargs)
-
-    monkeypatch.setenv("MODEL_PROTOCOL", "openai/responses")
-    monkeypatch.setenv("MODEL", "gpt-test")
-    monkeypatch.setenv("MODEL_REASONING_EFFORT", "high")
-    monkeypatch.setenv("PROMPT_CACHE_KEY", "session-test")
     monkeypatch.delenv("BASE_URL", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("MODEL", "gpt-test")
+    monkeypatch.setenv("MODEL_REASONING_EFFORT", "high")
     monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
 
     build_module.build_llm()
 
+    assert [protocol.value for protocol in build_module.ModelProtocol] == [
+        "openai/responses",
+        "anthropic",
+    ]
     assert captured == {
         "model": "gpt-test",
         "base_url": None,
@@ -464,10 +427,6 @@ def test_build_llm_uses_openai_responses_api_with_24h_prompt_cache(monkeypatch):
         "use_responses_api": True,
         "output_version": "responses/v1",
         "reasoning": {"effort": "high", "summary": "detailed"},
-        "model_kwargs": {
-            "prompt_cache_key": "session-test",
-            "prompt_cache_retention": "24h",
-        },
     }
 
 

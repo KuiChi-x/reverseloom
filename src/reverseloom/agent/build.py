@@ -1,5 +1,6 @@
 import os
-from typing import Any, Dict, Optional
+from enum import Enum
+from typing import Any, Optional
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
@@ -18,7 +19,6 @@ from reverseloom.tools.browser.automation import AUTOMATION_TOOLS
 from reverseloom.tools.browser.investigation import REVERSE_TOOLS
 from reverseloom.tools.filesystem import FILESYSTEM_TOOLS
 
-# Skill library shipped with reverseloom (progressive-disclosure via graphloom).
 _SKILLS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "skills")
 _AVAILABLE_SKILLS = ["*"]
 _SKILLS_DIRS = [_SKILLS_DIR, str(default_skills_dir())]
@@ -26,48 +26,43 @@ _SKILLS_DIRS = [_SKILLS_DIR, str(default_skills_dir())]
 SYSTEM_PROMPT = SAFE_AUTHORIZATION_PROMPT + DELIVERY_STRATEGY_PROMPT + BROWSER_AGENT_SPECIFIC_RULES_PROMPT
 ALL_TOOLS = REVERSE_TOOLS + FILESYSTEM_TOOLS + AUTOMATION_TOOLS
 
-_REASONING_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+
+class ModelProtocol(str, Enum):
+    OPENAI_RESPONSES = "openai/responses"
+    ANTHROPIC = "anthropic"
+
+
+class ReasoningEffort(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    XHIGH = "xhigh"
+    MAX = "max"
 
 
 def build_llm() -> BaseChatModel:
-    """Construct the configured OpenAI-compatible or Anthropic chat model."""
-    protocol = os.environ.get("MODEL_PROTOCOL", "openai").strip()
-    if protocol not in {"openai", "openai/responses", "anthropic"}:
-        raise ValueError(f"Unsupported MODEL_PROTOCOL: {protocol}")
-    model_name = os.environ.get("MODEL", "gpt-4o").strip()
-    kwargs: Dict[str, Any] = {
-        "model": model_name,
+    """Construct the configured OpenAI Responses or Anthropic model."""
+    protocol = ModelProtocol(os.environ.get("MODEL_PROTOCOL", ModelProtocol.OPENAI_RESPONSES))
+    raw_effort = os.environ.get("MODEL_REASONING_EFFORT", "").strip().lower()
+    effort = ReasoningEffort(raw_effort).value if raw_effort else None
+    kwargs: dict[str, Any] = {
+        "model": os.environ.get("MODEL", "gpt-4o").strip(),
         "base_url": os.environ.get("BASE_URL") or None,
         "api_key": os.environ.get("OPENAI_API_KEY") or None,
         "streaming": True,
     }
-    reasoning_effort = os.environ.get("MODEL_REASONING_EFFORT", "").strip().lower()
-    reasoning_enabled = reasoning_effort in _REASONING_EFFORTS
 
-    if protocol == "anthropic":
-        kwargs["model_kwargs"] = {"cache_control": {"type": "ephemeral"}}
-        if reasoning_enabled:
+    if protocol == ModelProtocol.ANTHROPIC:
+        kwargs["betas"] = ["context-management-2025-06-27"]
+        if effort:
             kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
-            kwargs["output_config"] = {"effort": reasoning_effort}
+            kwargs["output_config"] = {"effort": effort}
         return ChatAnthropic(**kwargs)
 
-    kwargs["model_kwargs"] = {
-        "prompt_cache_key": (
-            os.environ.get("PROMPT_CACHE_KEY", "").strip()
-            or f"reverseloom:{protocol}/{model_name}"
-        ),
-        "prompt_cache_retention": "24h",
-    }
-    if protocol == "openai/responses":
-        kwargs["use_responses_api"] = True
-        kwargs["output_version"] = "responses/v1"
-        if reasoning_enabled:
-            kwargs["reasoning"] = {
-                "effort": reasoning_effort,
-                "summary": "detailed",
-            }
-    elif reasoning_enabled:
-        kwargs["reasoning_effort"] = reasoning_effort
+    kwargs["use_responses_api"] = True
+    kwargs["output_version"] = "responses/v1"
+    if effort:
+        kwargs["reasoning"] = {"effort": effort, "summary": "detailed"}
     return ChatOpenAI(**kwargs)
 
 
