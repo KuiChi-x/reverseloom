@@ -337,8 +337,10 @@ def test_settings_read_and_write(monkeypatch, tmp_path):
         )
         assert protocol_field["type"] == "select"
         assert protocol_field["default"] == "openai/chat"
+        # 选项顺序即推荐优先级（按缓存命中率），三条线都必须在：部分模型只支持
+        # responses（gpt-5.6-sol 在 chat completions 上拒绝 tools+思考强度）。
         protocol_values = [option["value"] for option in protocol_field["options"]]
-        assert protocol_values == ["openai/chat", "anthropic"]
+        assert protocol_values == ["anthropic", "openai/chat", "openai/responses"]
         assert reasoning_field["type"] == "select"
 
         api_key = next(field for field in fields if field["key"] == "OPENAI_API_KEY")
@@ -415,9 +417,11 @@ def test_build_llm_defaults_to_openai_chat_completions(monkeypatch):
 
     build_module.build_llm()
 
-    # The Responses API line is gone: only chat completions and Anthropic remain.
+    # 三条线都必须留着：部分模型只支持 responses（gpt-5.6-sol 在 chat
+    # completions 上拒绝 function tools + reasoning_effort 组合）。
     assert [protocol.value for protocol in build_module.ModelProtocol] == [
         "openai/chat",
+        "openai/responses",
         "anthropic",
     ]
     # No use_responses_api / output_version: the Responses endpoint does not do
@@ -431,6 +435,31 @@ def test_build_llm_defaults_to_openai_chat_completions(monkeypatch):
         "stream_usage": True,
         "reasoning_effort": "high",
     }
+
+
+def test_build_llm_responses_protocol_keeps_the_responses_api(monkeypatch):
+    """gpt-5.6-sol 这类模型只能走 responses，这条线必须保留。"""
+    from reverseloom.agent import build as build_module
+
+    captured = {}
+
+    class FakeChatModel:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setenv("MODEL_PROTOCOL", "openai/responses")
+    monkeypatch.setenv("MODEL", "gpt-5.6-sol")
+    monkeypatch.setenv("MODEL_REASONING_EFFORT", "xhigh")
+    monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
+
+    build_module.build_llm()
+
+    assert captured["use_responses_api"] is True
+    assert captured["output_version"] == "responses/v1"
+    assert captured["reasoning"] == {"effort": "xhigh", "summary": "detailed"}
+    # responses 用原生 reasoning 内容块，不该带 chat completions 的参数
+    assert "reasoning_effort" not in captured
+    assert "stream_usage" not in captured
 
 
 def test_build_llm_clamps_max_effort_for_chat_completions(monkeypatch):

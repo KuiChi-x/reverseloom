@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
+from langchain_openai import ChatOpenAI
 
 from graphloom import build_agent_graph
 
@@ -29,6 +30,7 @@ ALL_TOOLS = REVERSE_TOOLS + FILESYSTEM_TOOLS + AUTOMATION_TOOLS
 
 class ModelProtocol(str, Enum):
     OPENAI_CHAT = "openai/chat"
+    OPENAI_RESPONSES = "openai/responses"
     ANTHROPIC = "anthropic"
 
 
@@ -41,14 +43,15 @@ class ReasoningEffort(str, Enum):
 
 
 def build_llm() -> BaseChatModel:
-    """Construct the configured OpenAI Chat Completions or Anthropic model.
+    """按 MODEL_PROTOCOL 构造模型客户端。三条线的取舍见 runtime/settings.py 的文案。
 
-    The Responses API is deliberately unsupported: the gateways we target only
-    do prompt prefix caching on ``/chat/completions``, while their
-    ``/responses`` implementation reuses a cached prefix just for
-    byte-identical requests, so an agent loop never hits it. Reasoning text is
-    recovered from the provider's ``reasoning_content`` field by
-    ``ChatOpenAIWithReasoning``.
+    缓存命中率：``/chat/completions`` 实测可复用前缀（qwen3.7-plus 55~90%），
+    而同一网关的 ``/responses`` 只在整包请求逐字节相同时才算命中，Agent 循环
+    永远碰不上，实测恒为 0%。
+
+    但协议不是随便选的 —— 部分模型（如 gpt-5.6-sol）在 chat completions 上
+    拒绝 "function tools + reasoning_effort" 组合，只能走 responses。所以三条
+    线都得留着，由配置按模型选。
     """
     protocol = ModelProtocol(os.environ.get("MODEL_PROTOCOL", ModelProtocol.OPENAI_CHAT))
     raw_effort = os.environ.get("MODEL_REASONING_EFFORT", "").strip().lower()
@@ -66,6 +69,14 @@ def build_llm() -> BaseChatModel:
             kwargs["thinking"] = {"type": "adaptive", "display": "summarized"}
             kwargs["output_config"] = {"effort": effort}
         return ChatAnthropic(**kwargs)
+
+    if protocol == ModelProtocol.OPENAI_RESPONSES:
+        # responses/v1 自带 reasoning 内容块，不需要 ChatOpenAIWithReasoning。
+        kwargs["use_responses_api"] = True
+        kwargs["output_version"] = "responses/v1"
+        if effort:
+            kwargs["reasoning"] = {"effort": effort, "summary": "detailed"}
+        return ChatOpenAI(**kwargs)
 
     kwargs["stream_usage"] = True
     if effort:

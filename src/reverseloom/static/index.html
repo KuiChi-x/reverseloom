@@ -481,8 +481,9 @@ const I18N = {
   }
 };
 const EN_TEXT = {
-  '模型服务':'Model service', '配置 OpenAI Chat Completions 或 Anthropic 模型接口。':'Configure an OpenAI Chat Completions or Anthropic endpoint.',
-  '模型协议':'Model protocol', '选择 OpenAI Chat Completions 或 Anthropic。':'Choose OpenAI Chat Completions or Anthropic.',
+  '模型服务':'Model service', '配置 Anthropic、OpenAI Chat Completions 或 OpenAI Responses 模型接口。':'Configure an Anthropic, OpenAI Chat Completions, or OpenAI Responses endpoint.',
+  '模型协议':'Model protocol', '按缓存命中率优先选择：Anthropic（显式缓存断点）> Chat Completions（实测可复用前缀，命中 55%~90%）> Responses。Responses 在我们的网关上只有整包请求逐字节相同才算命中，Agent 循环基本恒为 0%，请仅在模型不支持前两者时使用（例如 gpt-5.6-sol 在 Chat Completions 上拒绝 function tools + 思考强度 的组合）。':'Pick by prompt cache hit rate: Anthropic (explicit cache breakpoints) > Chat Completions (measured 55%-90% prefix reuse) > Responses. On our gateways Responses only counts a hit when the whole request is byte-identical, so an agent loop stays at roughly 0%. Use it only when the model rejects the other two (e.g. gpt-5.6-sol refuses function tools combined with reasoning effort on Chat Completions).',
+  'Anthropic Claude（推荐，显式缓存断点）':'Anthropic Claude (recommended, explicit cache breakpoints)', 'OpenAI Chat Completions（支持前缀缓存）':'OpenAI Chat Completions (prefix caching supported)', 'OpenAI Responses（缓存命中低，兜底使用）':'OpenAI Responses (almost no caching, last resort)',
   '思考强度':'Reasoning effort', 'low/medium/high/xhigh/max；Anthropic 使用 adaptive thinking 和 output_config.effort。留空表示不强制思考。':'low/medium/high/xhigh/max; Anthropic uses adaptive thinking and output_config.effort. Leave blank to use the provider default.', '默认（不强制）':'Default (not forced)',
   '接口地址':'Endpoint URL', '模型服务的 base URL。':'Base URL for the model service.', '只显示遮罩值，重新输入才会覆盖。':'Existing values are masked and only replaced when re-entered.', '模型':'Model', '必须支持图像输入和流式输出。':'Must support image input and streaming output.',
   '浏览器与隧道代理':'Browser and tunnel proxy', '指定 Chromium 内核，并通过本地认证隧道连接上游代理。':'Choose a Chromium executable and connect to an upstream proxy through a local authenticated tunnel.',
