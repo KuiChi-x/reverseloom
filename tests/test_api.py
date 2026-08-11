@@ -336,9 +336,9 @@ def test_settings_read_and_write(monkeypatch, tmp_path):
             field for field in fields if field["key"] == "MODEL_REASONING_EFFORT"
         )
         assert protocol_field["type"] == "select"
-        assert protocol_field["default"] == "openai/responses"
+        assert protocol_field["default"] == "openai/chat"
         protocol_values = [option["value"] for option in protocol_field["options"]]
-        assert protocol_values == ["openai/responses", "anthropic"]
+        assert protocol_values == ["openai/chat", "anthropic"]
         assert reasoning_field["type"] == "select"
 
         api_key = next(field for field in fields if field["key"] == "OPENAI_API_KEY")
@@ -397,7 +397,7 @@ def test_build_llm_builds_anthropic_model(monkeypatch):
     }
 
 
-def test_build_llm_defaults_to_openai_responses(monkeypatch):
+def test_build_llm_defaults_to_openai_chat_completions(monkeypatch):
     from reverseloom.agent import build as build_module
 
     captured = {}
@@ -411,23 +411,46 @@ def test_build_llm_defaults_to_openai_responses(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("MODEL", "gpt-test")
     monkeypatch.setenv("MODEL_REASONING_EFFORT", "high")
-    monkeypatch.setattr(build_module, "ChatOpenAI", FakeChatModel)
+    monkeypatch.setattr(build_module, "ChatOpenAIWithReasoning", FakeChatModel)
 
     build_module.build_llm()
 
+    # The Responses API line is gone: only chat completions and Anthropic remain.
     assert [protocol.value for protocol in build_module.ModelProtocol] == [
-        "openai/responses",
+        "openai/chat",
         "anthropic",
     ]
+    # No use_responses_api / output_version: the Responses endpoint does not do
+    # prefix caching on our gateways, so the OpenAI branch stays on
+    # /chat/completions and recovers reasoning from reasoning_content.
     assert captured == {
         "model": "gpt-test",
         "base_url": None,
         "api_key": None,
         "streaming": True,
-        "use_responses_api": True,
-        "output_version": "responses/v1",
-        "reasoning": {"effort": "high", "summary": "detailed"},
+        "stream_usage": True,
+        "reasoning_effort": "high",
     }
+
+
+def test_build_llm_clamps_max_effort_for_chat_completions(monkeypatch):
+    from reverseloom.agent import build as build_module
+
+    captured = {}
+
+    class FakeChatModel:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.delenv("MODEL_PROTOCOL", raising=False)
+    monkeypatch.setenv("MODEL", "gpt-test")
+    monkeypatch.setenv("MODEL_REASONING_EFFORT", "max")
+    monkeypatch.setattr(build_module, "ChatOpenAIWithReasoning", FakeChatModel)
+
+    build_module.build_llm()
+
+    # Chat completions rejects "max"; the Anthropic branch still passes it through.
+    assert captured["reasoning_effort"] == "xhigh"
 
 
 def test_authenticated_proxy_settings_feed_local_tunnel(monkeypatch):

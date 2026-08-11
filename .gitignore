@@ -38,3 +38,4 @@ sandbox_env/node_modules/
 .reverseloom_sessions
 .claude
 .agents
+.codegraph

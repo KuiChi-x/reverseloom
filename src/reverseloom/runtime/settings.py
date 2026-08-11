@@ -57,9 +57,9 @@ SETTINGS_GROUPS = [
         "id": "model",
         "label": "模型服务",
         "eyebrow": "MODEL RUNTIME",
-        "description": "配置 OpenAI Responses 或 Anthropic 模型接口。",
+        "description": "配置 OpenAI Chat Completions 或 Anthropic 模型接口。",
         "fields": [
-            _field("MODEL_PROTOCOL", "模型协议", "选择 OpenAI Responses 或 Anthropic。", field_type="select", default="openai/responses", options=[{"value": "openai/responses", "label": "OpenAI Responses"}, {"value": "anthropic", "label": "Anthropic Claude"}], apply="reconnect"),
+            _field("MODEL_PROTOCOL", "模型协议", "选择 OpenAI Chat Completions 或 Anthropic。", field_type="select", default="openai/chat", options=[{"value": "openai/chat", "label": "OpenAI Chat Completions"}, {"value": "anthropic", "label": "Anthropic Claude"}], apply="reconnect"),
             _field(
                 "MODEL_REASONING_EFFORT",
                 "思考强度",

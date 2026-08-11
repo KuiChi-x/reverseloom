@@ -4,10 +4,10 @@ from typing import Any, Optional
 
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
-from langchain_openai import ChatOpenAI
 
 from graphloom import build_agent_graph
 
+from reverseloom.agent.chat_model import ChatOpenAIWithReasoning
 from reverseloom.browser import create_browser_observer_node
 from reverseloom.agent.prompts import (
     BROWSER_AGENT_SPECIFIC_RULES_PROMPT,
@@ -28,7 +28,7 @@ ALL_TOOLS = REVERSE_TOOLS + FILESYSTEM_TOOLS + AUTOMATION_TOOLS
 
 
 class ModelProtocol(str, Enum):
-    OPENAI_RESPONSES = "openai/responses"
+    OPENAI_CHAT = "openai/chat"
     ANTHROPIC = "anthropic"
 
 
@@ -41,8 +41,16 @@ class ReasoningEffort(str, Enum):
 
 
 def build_llm() -> BaseChatModel:
-    """Construct the configured OpenAI Responses or Anthropic model."""
-    protocol = ModelProtocol(os.environ.get("MODEL_PROTOCOL", ModelProtocol.OPENAI_RESPONSES))
+    """Construct the configured OpenAI Chat Completions or Anthropic model.
+
+    The Responses API is deliberately unsupported: the gateways we target only
+    do prompt prefix caching on ``/chat/completions``, while their
+    ``/responses`` implementation reuses a cached prefix just for
+    byte-identical requests, so an agent loop never hits it. Reasoning text is
+    recovered from the provider's ``reasoning_content`` field by
+    ``ChatOpenAIWithReasoning``.
+    """
+    protocol = ModelProtocol(os.environ.get("MODEL_PROTOCOL", ModelProtocol.OPENAI_CHAT))
     raw_effort = os.environ.get("MODEL_REASONING_EFFORT", "").strip().lower()
     effort = ReasoningEffort(raw_effort).value if raw_effort else None
     kwargs: dict[str, Any] = {
@@ -59,11 +67,11 @@ def build_llm() -> BaseChatModel:
             kwargs["output_config"] = {"effort": effort}
         return ChatAnthropic(**kwargs)
 
-    kwargs["use_responses_api"] = True
-    kwargs["output_version"] = "responses/v1"
+    kwargs["stream_usage"] = True
     if effort:
-        kwargs["reasoning"] = {"effort": effort, "summary": "detailed"}
-    return ChatOpenAI(**kwargs)
+        # Chat completions caps at xhigh; max only exists on the Anthropic side.
+        kwargs["reasoning_effort"] = "xhigh" if effort == ReasoningEffort.MAX else effort
+    return ChatOpenAIWithReasoning(**kwargs)
 
 
 def build_agent(llm: Optional[BaseChatModel] = None, checkpointer=None):
