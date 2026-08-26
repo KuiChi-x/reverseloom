@@ -62,7 +62,7 @@ SETTINGS_GROUPS = [
             # 选项顺序即推荐优先级，label 里标出缓存命中情况。默认取中间那档：
             # 既有前缀缓存，又适配大多数 OpenAI 兼容网关；不默认 anthropic，
             # 否则老配置会被静默切成 ChatAnthropic 去打 OpenAI 端点。
-            _field("MODEL_PROTOCOL", "模型协议", "按缓存命中率优先选择：Anthropic > Chat Completions > Responses。Responses 缓存命中率较低。", field_type="select", default="openai/chat", options=[{"value": "anthropic", "label": "Anthropic Claude（推荐，显式缓存断点）"}, {"value": "openai/chat", "label": "OpenAI Chat Completions（支持前缀缓存）"}, {"value": "openai/responses", "label": "OpenAI Responses（几乎无缓存，仅兜底）"}], apply="reconnect"),
+            _field("MODEL_PROTOCOL", "模型协议", "", field_type="select", default="openai/chat", options=[{"value": "anthropic", "label": "Anthropic Claude"}, {"value": "openai/chat", "label": "OpenAI Chat Completions"}, {"value": "openai/responses", "label": "OpenAI Responses"}], apply="reconnect"),
             _field(
                 "MODEL_REASONING_EFFORT",
                 "思考强度",

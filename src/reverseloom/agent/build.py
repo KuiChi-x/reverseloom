@@ -45,9 +45,10 @@ class ReasoningEffort(str, Enum):
 def build_llm() -> BaseChatModel:
     """按 MODEL_PROTOCOL 构造模型客户端。三条线的取舍见 runtime/settings.py 的文案。
 
-    缓存命中率：``/chat/completions`` 实测可复用前缀（qwen3.7-plus 55~90%），
-    而同一网关的 ``/responses`` 只在整包请求逐字节相同时才算命中，Agent 循环
-    永远碰不上，实测恒为 0%。
+    缓存命中率：``/chat/completions`` 靠隐式前缀缓存（qwen3.7-plus 实测 55~90%）。
+    ``/responses`` 需要显式缓存断点，由 graphloom 的 context_renderer 标在
+    历史块上（仅 GPT-5.6+ 支持，实测 95%）；不标断点则恒为 0%，这是之前把
+    ``/responses`` 判成"几乎无缓存"的真实原因。
 
     但协议不是随便选的 —— 部分模型（如 gpt-5.6-sol）在 chat completions 上
     拒绝 "function tools + reasoning_effort" 组合，只能走 responses。所以三条

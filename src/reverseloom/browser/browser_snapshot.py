@@ -2,7 +2,7 @@ import asyncio
 import logging
 import base64
 from typing import Dict, Any
-from reverseloom.browser.image_utils import draw_bounding_boxes
+from reverseloom.browser.image_utils import downscale_screenshot, draw_bounding_boxes
 from reverseloom.browser.get_interactive_elements import execute_get_interactive_elements
 
 
@@ -74,10 +74,14 @@ async def capture_browser_snapshot(session) -> Dict[str, Any]:
 
             # 4. Draw bounding boxes on screenshot using Python (Pillow)
             # PIL operations are CPU-bound; run in thread pool to keep the event loop free.
+            loop = asyncio.get_running_loop()
             if bboxes:
-                loop = asyncio.get_running_loop()
                 screenshot = await loop.run_in_executor(
                     None, draw_bounding_boxes, screenshot, bboxes, dpr
+                )
+            else:
+                screenshot = await loop.run_in_executor(
+                    None, downscale_screenshot, screenshot
                 )
 
         except asyncio.TimeoutError:

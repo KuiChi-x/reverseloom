@@ -34,6 +34,38 @@ def get_cross_platform_font(font_size: int):
     _FONT_CACHE[cache_key] = font
     return font
 
+def _encode_for_model(image: Image.Image) -> str:
+    """Downscale to a long edge of 1280 and encode as JPEG for the LLM."""
+    image = image.convert('RGB')
+    if max(image.size) > 1280:
+        scale = 1280 / max(image.size)
+        image = image.resize(
+            (max(1, round(image.width * scale)), max(1, round(image.height * scale))),
+            Image.LANCZOS,
+        )
+
+    buffer = io.BytesIO()
+    image.save(buffer, format='JPEG', quality=80, optimize=True)
+    encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+    buffer.close()
+    return f"data:image/jpeg;base64,{encoded}"
+
+
+def downscale_screenshot(screenshot_b64: str) -> str:
+    """Shrink an un-annotated screenshot for the LLM (no bboxes to draw)."""
+    if not screenshot_b64:
+        return screenshot_b64
+    try:
+        raw = base64.b64decode(
+            screenshot_b64.split(",")[-1] if "," in screenshot_b64 else screenshot_b64
+        )
+        with Image.open(io.BytesIO(raw)) as image:
+            return _encode_for_model(image)
+    except Exception as e:
+        logger.error(f"Failed to downscale screenshot: {e}")
+        return screenshot_b64
+
+
 def draw_bounding_boxes(
     screenshot_b64: str,
     bboxes: List[Dict[str, Any]],
@@ -165,13 +197,8 @@ def draw_bounding_boxes(
         # Composite overlay onto image
         image = Image.alpha_composite(image, overlay)
 
-        # Encode as JPEG (quality=85) — much smaller than PNG for UI screenshots
-        output_buffer = io.BytesIO()
-        image.convert('RGB').save(output_buffer, format='JPEG', quality=85, optimize=True)
-        jpeg_bytes = output_buffer.getvalue()
-        highlighted_b64 = f"data:image/jpeg;base64,{base64.b64encode(jpeg_bytes).decode('utf-8')}"
+        highlighted_b64 = _encode_for_model(image)
 
-        output_buffer.close()
         image.close()
         overlay.close()
 
@@ -179,4 +206,4 @@ def draw_bounding_boxes(
 
     except Exception as e:
         logger.error(f"Failed to draw bounding boxes: {e}")
-        return screenshot_b64
+        return downscale_screenshot(screenshot_b64)
