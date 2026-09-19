@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import uuid4
 
+from langchain_core.messages import HumanMessage
 from langgraph.types import Command
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -44,6 +45,24 @@ class _LazyBrowserManager:
 
 
 browser_manager = _LazyBrowserManager()
+
+
+def _history_sort_key(event: Dict[str, Any]) -> float:
+    """归并 `events`(ISO 字符串)与 `timeline`(毫秒整数)两种时间戳。
+
+    两个通道的时间格式不同,直接比较会 TypeError。统一折算成毫秒;取不到时间的
+    事件排到末尾,保持相对顺序而不是抛错。
+    """
+    value = event.get("created_at")
+    if isinstance(value, (int, float)):
+        return float(value) * (1000.0 if value < 1e12 else 1.0)
+    if isinstance(value, str) and value:
+        text = value if re.search(r"(?:Z|[+-]\d{2}:?\d{2})$", value) else f"{value}+00:00"
+        try:
+            return datetime.fromisoformat(text).timestamp() * 1000.0
+        except ValueError:
+            return float("inf")
+    return float("inf")
 
 
 async def _send(ws: WebSocket, payload: Dict[str, Any]) -> None:
@@ -238,7 +257,14 @@ def create_app() -> FastAPI:
             "configurable": {"thread_id": session_id, "checkpoint_ns": ""}
         })
         values = (checkpoint.checkpoint.get("channel_values") or {}) if checkpoint else {}
-        timeline = list(values.get("events", []) or [])
+        # 两个来源各管一段:`events` 只存 user/assistant 两端的对话消息,
+        # 每一步的 think/tool_calls 由 graphloom 的 `timeline` 投影提供
+        # (旧版是 events 里的 type="step" 事件,框架已不再写)。
+        messages = [
+            event for event in (values.get("events") or [])
+            if isinstance(event, dict) and event.get("type") == "message"
+        ]
+        steps = [step for step in (values.get("timeline") or []) if isinstance(step, dict)]
         # Latest agent delivery only (finish node copies current_delivery_manifest
         # into approved_artifact_manifest). Attach to the last assistant reply in UI.
         delivered = _manifest_artifacts(
@@ -246,9 +272,18 @@ def create_app() -> FastAPI:
             list(values.get("current_delivery_manifest") or values.get("approved_artifact_manifest") or []),
         )
         return JSONResponse({
-            "messages": [event for event in timeline if event.get("type") == "message"],
-            "past_steps": [event.get("step") for event in timeline if event.get("type") == "step"],
-            "timeline": timeline,
+            "messages": messages,
+            "past_steps": steps,
+            # 前端按 created_at 归并两者,所以 step 也要带上时间戳。
+            "timeline": sorted(
+                [*messages, *({
+                    "type": "step",
+                    "id": step.get("step_id"),
+                    "created_at": step.get("timestamp"),
+                    "step": step,
+                } for step in steps)],
+                key=lambda event: _history_sort_key(event),
+            ),
             "delivered_artifacts": delivered,
         })
 
@@ -513,19 +548,22 @@ def create_app() -> FastAPI:
             cancel_event = ws.app.state.cancels.setdefault(run_session_id, asyncio.Event())
             cancel_event.clear()
 
+            # 用户这一轮的输入就是一条 HumanMessage;附件作为同一条消息的额外
+            # content part 同行携带,不再是独立的 state 字段。
+            user_message = HumanMessage(
+                content=[{"type": "text", "text": display_text}, *attachment_parts]
+            )
+
             is_resume = "resume" in msg
             if is_resume:
-                invoke_input = Command(
-                    resume=msg["resume"],
-                    update={
-                        "attach_message_parts": attachment_parts or None,
-                        "input_artifact_manifest": input_manifest,
-                    },
-                )
+                # 中断恢复:附件随恢复值一起补进 messages,add_messages 负责追加。
+                update: dict[str, Any] = {"input_artifact_manifest": input_manifest}
+                if attachment_parts:
+                    update["messages"] = [HumanMessage(content=list(attachment_parts))]
+                invoke_input = Command(resume=msg["resume"], update=update)
             else:
                 invoke_input = {
-                    "input_query": display_text,
-                    "attach_message_parts": attachment_parts or None,
+                    "messages": [user_message],
                     "input_artifact_manifest": input_manifest,
                 }
 

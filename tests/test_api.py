@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 def test_artifact_review_excludes_browser_observation_messages():
     import asyncio
 
+    from langchain_core.messages import HumanMessage
+
     from reverseloom.agent.review import create_artifact_review_node
 
     captured = {}
@@ -27,16 +29,14 @@ def test_artifact_review_excludes_browser_observation_messages():
         node({
             "observer_message_parts": ["browser screenshot"],
             "current_delivery_manifest": [{"path": "artifact.py"}],
-            "past_steps": [{"result": "verified"}],
-            "input_query": "build a scraper",
+            "messages": [HumanMessage(content="build a scraper")],
         })
     )
 
     assert result == {"end_tag": True}
     assert captured["observer_message_parts"] == []
     assert captured["current_delivery_manifest"] == [{"path": "artifact.py"}]
-    assert captured["past_steps"] == [{"result": "verified"}]
-    assert captured["input_query"] == "build a scraper"
+    assert [m.content for m in captured["messages"]] == ["build a scraper"]
 
 
 def test_app_boots_and_injects_checkpointer():
@@ -138,7 +138,7 @@ def test_history_endpoint_restores_checkpoint_steps():
                 "configurable": {"thread_id": "demo", "checkpoint_ns": ""}
             }
             return SimpleNamespace(
-                checkpoint={"channel_values": {"events": [{"type": "step", "step": step}]}}
+                checkpoint={"channel_values": {"timeline": [step]}}
             )
 
     with TestClient(app) as client:
@@ -505,7 +505,7 @@ def test_authenticated_proxy_settings_feed_local_tunnel(monkeypatch):
 def test_agent_graph_compiles_with_find_fault():
     from reverseloom.agent.build import build_agent
     from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
-    from langchain_core.messages import AIMessage
+    from langchain_core.messages import AIMessage, HumanMessage
 
     class FakeLLM(FakeMessagesListChatModel):
         def bind_tools(self, tools, **kw):
@@ -738,7 +738,7 @@ def test_websocket_returns_streamed_direct_reply_without_message_store(monkeypat
 
 async def test_direct_reply_skips_artifact_review_and_finishes():
     from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
-    from langchain_core.messages import AIMessage
+    from langchain_core.messages import AIMessage, HumanMessage
 
     from graphloom import build_agent_graph
 
@@ -758,7 +758,7 @@ async def test_direct_reply_skips_artifact_review_and_finishes():
     )
 
     result = await graph.ainvoke(
-        {"input_query": "hello", "session_id": "direct"},
+        {"messages": [HumanMessage(content="hello")], "session_id": "direct"},
         config={"recursion_limit": 5},
     )
 

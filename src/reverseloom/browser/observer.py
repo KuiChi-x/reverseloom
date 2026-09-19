@@ -3,7 +3,7 @@
 Runs before `ai` every turn. Captures a FRESH browser snapshot (URL, DOM
 digest, tabs, debugger/breakpoint state, screenshot) from the live session and
 returns it as `observer_message_parts` — graphloom writes this field with
-overwrite semantics and never persists it into `past_steps`. That's exactly what
+overwrite semantics and never persists it into `messages`. That's exactly what
 a browser agent needs: the page state is huge and changes every turn, so only
 the latest snapshot is injected, keeping the agent grounded without exploding
 its memory.
