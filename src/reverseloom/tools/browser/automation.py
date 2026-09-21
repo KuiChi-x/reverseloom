@@ -820,6 +820,6 @@ AUTOMATION_TOOLS = [
     query_element_info,
     wait_for_seconds,
     browser_evaluate,
-    visual_locate,
+    # visual_locate,
     request_user_interaction,
 ]
