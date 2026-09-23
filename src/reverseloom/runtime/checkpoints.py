@@ -166,9 +166,13 @@ class CheckpointerManager:
                         DELETE FROM checkpoint_blobs b
                         WHERE b.thread_id = %s
                           AND NOT EXISTS (
-                            SELECT 1 FROM checkpoints c
+                            SELECT 1
+                            FROM checkpoints c,
+                                 jsonb_each_text(c.checkpoint -> 'channel_versions') cv
                             WHERE c.thread_id = b.thread_id
                               AND c.checkpoint_ns = b.checkpoint_ns
+                              AND cv.key = b.channel
+                              AND cv.value = b.version
                           )
                         """,
                         (thread_id,),
